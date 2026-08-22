@@ -13,19 +13,25 @@ excel_file = "61.xlsx"
 
 try:
   xls = pd.ExcelFile(excel_file)
-  # Lista de abas operacionais
-  sheets = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
+  # Seleciona abas ignorando bases
+  todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # Sidebar - Filtro de Data
-  st.sidebar.header("⚙️ Configurações")
-  data_selecionada = st.sidebar.selectbox(
-      "📅 Selecione a Data:", options=list(reversed(sheets)), index=0
+  # Define por padrão a aba de dados reais ('31.10') se existir, senão a primeira da lista
+  padrao_idx = (
+      todas_abas.index("31.10")
+      if "31.10" in todas_abas
+      else len(todas_abas) - 1
   )
 
-  # Carrega os dados da aba escolhida
+  st.sidebar.header("⚙️ Configurações")
+  # O Streamlit guarda a escolha do usuário na variável data_selecionada
+  data_selecionada = st.sidebar.selectbox(
+      "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
+  )
+
+  # Carrega estritamente a aba selecionada no menu
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Mapeamento das Unidades (Colunas)
   unidades_map = {
       "SPA": 8,
       "FRIG": 7,
@@ -42,10 +48,11 @@ try:
   st.caption(f"📊 Exibindo dados em tempo real da aba: **{data_selecionada}**")
   st.markdown("---")
 
-  # Função para extrair valor com base no nome da linha
   def get_metric(metric_name, col_idx):
     try:
-      row = raw_df[raw_df.iloc[:, 1].astype(str).str.contains(metric_name, na=False)]
+      row = raw_df[
+          raw_df.iloc[:, 1].astype(str).str.contains(metric_name, na=False)
+      ]
       if not row.empty:
         val = row.iloc[0, col_idx]
         return val if pd.notna(val) else 0
@@ -53,14 +60,12 @@ try:
     except:
       return 0
 
-  # Identifica coluna selecionada
   col_idx = (
       unidades_map[unidade_sel]
       if unidade_sel != "Consolidado Geral"
       else unidades_map["SPA"]
   )
 
-  # Extração dinâmica dos valores reais
   vol_total = get_metric("Volume total", col_idx)
   ocup_cam = get_metric("Ocupação caminhões", col_idx)
   tot_passivo = get_metric("Total passivo", col_idx)
@@ -76,12 +81,22 @@ try:
 
   absenteismo = get_metric("Absenteísmo", col_idx)
 
-  # Formatação dos valores
-  vol_fmt = f"{vol_total:,.0f} UC".replace(",", ".") if isinstance(vol_total, (int, float)) else str(vol_total)
-  ocup_fmt = f"{ocup_cam * 100:.1f}%" if isinstance(ocup_cam, (int, float)) and ocup_cam <= 1 else f"{ocup_cam}%"
-  ret_fmt = f"{ret_dia * 100:.2f}%" if isinstance(ret_dia, (int, float)) and ret_dia <= 1 else f"{ret_dia}%"
+  vol_fmt = (
+      f"{vol_total:,.0f} UC".replace(",", ".")
+      if isinstance(vol_total, (int, float)) and vol_total > 0
+      else str(vol_total)
+  )
+  ocup_fmt = (
+      f"{ocup_cam * 100:.1f}%"
+      if isinstance(ocup_cam, (int, float)) and 0 < ocup_cam <= 1
+      else f"{ocup_cam}%"
+  )
+  ret_fmt = (
+      f"{ret_dia * 100:.2f}%"
+      if isinstance(ret_dia, (int, float)) and 0 < ret_dia <= 1
+      else f"{ret_dia}%"
+  )
 
-  # Exibição dos KPIs
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.metric(label="📦 Volume Total", value=vol_fmt)
@@ -94,7 +109,6 @@ try:
 
   st.markdown("---")
 
-  # Gráficos Dinâmicos
   col_g1, col_g2 = st.columns(2)
   with col_g1:
     st.subheader("📦 Visão Geral de Cargas")
@@ -131,4 +145,4 @@ try:
     st.info(f"💡 **Absenteísmo do Dia ({unidade_sel}):** {absenteismo}")
 
 except Exception as e:
-  st.error(f"Aguardando sincronização com a planilha: {e}")
+  st.error(f"Aguardando sincronização de dados: {e}")
