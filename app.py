@@ -77,8 +77,7 @@ try:
         return val_num if pd.notna(val_num) else 0
     return 0
 
-  # --- LEITURA DOS DADOS ---
-
+  # LEITURA DOS DADOS
   # 1. Fluxo de Cargas
   cargas_dia = get_metric_val("CARGAS DO DIA")
   cargas_d1 = get_metric_val("CARGAS EM D+1")
@@ -126,19 +125,36 @@ try:
   ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
   ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
 
-  # ================= LINHA 1: OPERAÇÃO E PASSIVOS (2 GRÁFICOS) =================
+  # Função auxiliar para padronizar o visual, altura e interatividade limpa no mobile
+  def aplicar_estilo_grafico(fig, altura=320):
+    fig.update_layout(
+        height=altura,
+        showlegend=False,
+        margin=dict(l=10, r=10, t=30, b=10),
+        xaxis_title="",
+        yaxis_title="",
+        hoverlabel=dict(bgcolor="white", font_size=12),
+    )
+    fig.update_traces(
+        hovertemplate="<b>%{x}</b><br>Valor: %{y}<extra></extra>"
+    )
+    return fig
+
+  # Configuração para desativar a barra de ferramentas de zoom no celular
+  plotly_config = {"displayModeBar": False, "responsive": True}
+
+  # ================= LINHA 1: OPERAÇÃO E PASSIVOS =================
   col_l1_1, col_l1_2 = st.columns(2)
 
-  # GRÁFICO 1: FLUXO DE CARGAS
   with col_l1_1:
     st.subheader("📦 Visão Geral de Cargas")
     df_g1 = pd.DataFrame({
         "Indicador": [
             "Cargas do Dia",
             "Cargas em D+1",
-            "Cargas pendentes de saída",
-            "Recargas de Caminhão",
-            "Recargas de HR",
+            "Pendentes saída",
+            "Recargas Cam.",
+            "Recargas HR",
         ],
         "Quantidade": [
             cargas_dia,
@@ -162,18 +178,20 @@ try:
             "#8E44AD",
         ],
     )
-    fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd.")
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig1),
+        use_container_width=True,
+        config=plotly_config,
+    )
 
-  # GRÁFICO 2: PASSIVOS
   with col_l1_2:
     st.subheader("🚨 Passivos Operacionais")
     df_g2 = pd.DataFrame({
         "Indicador": [
             "Total Passivo",
-            "Passivo de Agendamento",
-            "Passivo de Rota",
-            "Passivo de SMS",
+            "Agendamento",
+            "Rota",
+            "SMS",
         ],
         "Quantidade": [tot_passivo, pass_agend, pass_rota, pass_sms],
     })
@@ -185,23 +203,25 @@ try:
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
-    fig2.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd.")
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig2),
+        use_container_width=True,
+        config=plotly_config,
+    )
 
   st.markdown("---")
 
-  # ================= LINHA 2: EQUIPES E FROTA (2 GRÁFICOS) =================
+  # ================= LINHA 2: EQUIPES E FROTA =================
   col_l2_1, col_l2_2 = st.columns(2)
 
-  # GRÁFICO 3: GESTÃO DE EQUIPES
   with col_l2_1:
     st.subheader("👥 Gestão de Equipes")
     df_g3 = pd.DataFrame({
         "Indicador": [
             "Equipes Ativas",
-            "Equipes de Férias",
+            "Equipes Férias",
             "Absenteísmo",
-            "Capacidade de Equipes",
+            "Capacidade Eq.",
         ],
         "Quantidade": [eq_ativa, eq_ferias, absenteismo, cap_equipes],
     })
@@ -213,12 +233,12 @@ try:
         text_auto=True,
         color_discrete_sequence=["#27AE60", "#F39C12", "#C0392B", "#2980B9"],
     )
-    fig3.update_layout(
-        showlegend=False, xaxis_title="", yaxis_title="Pessoas / Equipes"
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig3),
+        use_container_width=True,
+        config=plotly_config,
     )
-    st.plotly_chart(fig3, use_container_width=True)
 
-  # GRÁFICO 4: COMPOSIÇÃO DA FROTA
   with col_l2_2:
     st.subheader("🚛 Composição da Frota")
     df_g4 = pd.DataFrame({
@@ -233,21 +253,21 @@ try:
         text_auto=True,
         color_discrete_sequence=["#16A085", "#2980B9", "#8E44AD"],
     )
-    fig4.update_layout(
-        showlegend=False, xaxis_title="", yaxis_title="Qtd. Veículos"
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig4),
+        use_container_width=True,
+        config=plotly_config,
     )
-    st.plotly_chart(fig4, use_container_width=True)
 
   st.markdown("---")
 
-  # ================= LINHA 3: ATENDIMENTO, OCUPAÇÃO E RETORNO (3 GRÁFICOS) =================
+  # ================= LINHA 3: ATENDIMENTO, OCUPAÇÃO E RETORNO =================
   col_l3_1, col_l3_2, col_l3_3 = st.columns(3)
 
-  # GRÁFICO 5: ATENDIMENTO
   with col_l3_1:
     st.subheader("🎯 Atendimento")
     df_g5 = pd.DataFrame({
-        "Indicador": ["Volume total (UC)", "Quantidade de clientes"],
+        "Indicador": ["Volume (UC)", "Qtd. Clientes"],
         "Valor": [vol_total, qtd_clientes],
         "Texto": [f"{vol_total:,.0f}".replace(",", "."), f"{qtd_clientes:,.0f}"],
     })
@@ -259,19 +279,22 @@ try:
         text="Texto",
         color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
-    fig5.update_layout(
-        showlegend=False, xaxis_title="", yaxis_title="Quantidade"
+    fig5.update_traces(
+        hovertemplate="<b>%{x}</b><br>Valor: %{text}<extra></extra>"
     )
-    st.plotly_chart(fig5, use_container_width=True)
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig5),
+        use_container_width=True,
+        config=plotly_config,
+    )
 
-  # GRÁFICO 6: OCUPAÇÃO & EFICIÊNCIA (%)
   with col_l3_2:
-    st.subheader("📊 Ocupação e Eficiência (%)")
+    st.subheader("📊 Ocupação (%)")
     df_g6 = pd.DataFrame({
         "Indicador": [
-            "Ocupação dos caminhões",
-            "Ocupação CD",
-            "Estudo de Entregas",
+            "Ocup. Caminhões",
+            "Ocup. CD",
+            "Estudo Entregas",
         ],
         "Valor": [ocup_cam_pct, ocup_cd_pct, estudo_pct],
         "Texto": [
@@ -288,17 +311,18 @@ try:
         text="Texto",
         color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
-    fig6.update_layout(
-        showlegend=False,
-        xaxis_title="",
-        yaxis_title="Porcentagem (%)",
-        yaxis_range=[0, 100],
+    fig6.update_layout(yaxis_range=[0, 100])
+    fig6.update_traces(
+        hovertemplate="<b>%{x}</b><br>Percentual: %{text}<extra></extra>"
     )
-    st.plotly_chart(fig6, use_container_width=True)
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig6),
+        use_container_width=True,
+        config=plotly_config,
+    )
 
-  # GRÁFICO 7: RETORNO (%)
   with col_l3_3:
-    st.subheader("🔄 Percentual de Retorno (%)")
+    st.subheader("🔄 Retorno (%)")
     df_g7 = pd.DataFrame({
         "Indicador": ["Retorno Dia", "Retorno Mês"],
         "Valor": [ret_dia_pct, ret_mes_pct],
@@ -312,10 +336,14 @@ try:
         text="Texto",
         color_discrete_sequence=["#E74C3C", "#C0392B"],
     )
-    fig7.update_layout(
-        showlegend=False, xaxis_title="", yaxis_title="Porcentagem (%)"
+    fig7.update_traces(
+        hovertemplate="<b>%{x}</b><br>Percentual: %{text}<extra></extra>"
     )
-    st.plotly_chart(fig7, use_container_width=True)
+    st.plotly_chart(
+        aplicar_estilo_grafico(fig7),
+        use_container_width=True,
+        config=plotly_config,
+    )
 
 except Exception as e:
   st.error(f"Erro ao processar os dados da planilha: {e}")
