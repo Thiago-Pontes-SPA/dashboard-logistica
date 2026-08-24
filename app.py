@@ -213,6 +213,10 @@ try:
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
+    # Garante que o topo do eixo Y tenha espaço extra para valores pequenos como 1 aparecerem perfeitamente
+    max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.25
+    fig2.update_layout(yaxis_range=[0, max_passivo])
+
     st.plotly_chart(
         aplicar_estilo_grafico(fig2),
         use_container_width=True,
