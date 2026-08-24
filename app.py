@@ -22,14 +22,12 @@ def obter_lista_abas(file_path):
 try:
   todas_abas = obter_lista_abas(excel_file)
 
-  # Pega a data atual ou encontra a aba correspondente/mais próxima já preenchida
   hoje_str = datetime.now().strftime("%d.%m.%2y")
 
   padrao_idx = len(todas_abas) - 1
   if hoje_str in todas_abas:
     padrao_idx = todas_abas.index(hoje_str)
   else:
-    # Se a data de hoje não estiver na lista, seleciona a última data válida até hoje
     for idx, aba in enumerate(todas_abas):
       if aba <= hoje_str:
         padrao_idx = idx
@@ -39,40 +37,29 @@ try:
       "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
   )
 
-  raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
+  @st.cache_data(ttl=60)
+  def carregar_aba(file_path, sheet_name):
+    return pd.read_excel(file_path, sheet_name=sheet_name)
 
-  # Mapeamento das colunas da planilha
-  header_row_idx = None
-  for idx, r in raw_df.iterrows():
-    row_vals = [str(v).strip().upper() for v in r.values]
-    if "SPA" in row_vals and "BGU" in row_vals:
-      header_row_idx = idx
-      break
+  raw_df = carregar_aba(excel_file, data_selecionada)
 
   unidades_map = {
-      "Consolidado Geral (CD'S)": "CD'S",
-      "BGU": "BGU",
-      "CJU": "CJU",
-      "LST": "LST",
-      "NIG": "NIG",
-      "FRIG": "FRIG",
-      "SPA": "SPA",
+      "Consolidado Geral (CD'S)": 7,
+      "BGU": 1,
+      "CJU": 2,
+      "LST": 3,
+      "NIG": 4,
+      "FRIG": 5,
+      "SPA": 6,
   }
 
   unidade_sel = st.selectbox(
-      "🎯 Filtrar por Unidade:", list(unidades_map.keys())
+      "🎯 Filtrar por Unidade:",
+      list(unidades_map.keys()),
+      key="filtro_unidade_key",
   )
 
-  col_idx = 7  # Padrão CD'S (Coluna 7)
-  if header_row_idx is not None:
-    headers = [
-        str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
-    ]
-    alvo = unidades_map[unidade_sel].upper()
-    for i, h in enumerate(headers):
-      if alvo == h or (alvo in h and len(h) <= 5):
-        col_idx = i
-        break
+  col_idx = unidades_map[unidade_sel]
 
   st.caption(
       f"📊 Exibindo dados da aba: **{data_selecionada}** | Unidade:"
@@ -141,11 +128,13 @@ try:
     fig.update_layout(
         height=altura,
         showlegend=False,
-        margin=dict(l=10, r=10, t=30, b=10),
+        margin=dict(l=10, r=10, t=35, b=10),
         xaxis=dict(fixedrange=True, title=""),
         yaxis=dict(fixedrange=True, title=""),
         dragmode=False,
     )
+    # FORÇA OS TEXTOS/NÚMEROS A FICAREM DO LADO DE FORA (ACIMA) DAS BARRAS
+    fig.update_traces(textposition="outside", cliponaxis=False)
     return fig
 
   plotly_config = {
@@ -213,8 +202,8 @@ try:
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
-    # Garante que o topo do eixo Y tenha espaço extra para valores pequenos como 1 aparecerem perfeitamente
-    max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.25
+    # Folga no topo do eixo Y para acomodar os números do lado de fora das barras
+    max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.3
     fig2.update_layout(yaxis_range=[0, max_passivo])
 
     st.plotly_chart(
@@ -322,7 +311,7 @@ try:
         text="Texto",
         color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
-    fig6.update_layout(yaxis_range=[0, 100])
+    fig6.update_layout(yaxis_range=[0, 115])
     st.plotly_chart(
         aplicar_estilo_grafico(fig6),
         use_container_width=True,
@@ -344,6 +333,8 @@ try:
         text="Texto",
         color_discrete_sequence=["#E74C3C", "#C0392B"],
     )
+    max_ret = max(ret_dia_pct, ret_mes_pct, 1.0) * 1.3
+    fig7.update_layout(yaxis_range=[0, max_ret])
     st.plotly_chart(
         aplicar_estilo_grafico(fig7),
         use_container_width=True,
