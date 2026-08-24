@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="Status Operacional Logística", page_icon="🚚", layout="wide"
 )
 
-st.title("🚚 Status Operacional de Logística")
+st.title("🚚 Status Operacional de Logística - Gestão BCFNS ")
 st.subheader("Painel Executivo Diário")
 
 excel_file = "61.xlsx"
