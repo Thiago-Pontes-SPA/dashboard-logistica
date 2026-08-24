@@ -3,34 +3,12 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Configuração da página
 st.set_page_config(
-    page_title="Status Operacional - Coca-Cola Logística",
-    page_icon="🥤",
-    layout="wide",
+    page_title="Status Operacional Logística", page_icon="🚚", layout="wide"
 )
 
-# Estilização customizada em CSS para botões e seletores no padrão Coca-Cola
-st.markdown(
-    """
-    <style>
-    .main .block-container {
-        padding-top: 2rem;
-    }
-    h1 {
-        color: #E41E2B !important;
-        font-weight: 700;
-    }
-    div[data-baseweb="select"] > div {
-        border-color: #E41E2B !important;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
-# Título Principal com a Marca
-st.title("🥤 Status Operacional de Logística - Gestão BCFNS")
+# Título do Painel
+st.title("🚚 Status Operacional de Logística - Gestão BCFNS")
 st.subheader("Painel Executivo Diário")
 
 excel_file = "61.xlsx"
@@ -55,6 +33,7 @@ try:
       if aba <= hoje_str:
         padrao_idx = idx
 
+  # Mapeamento das unidades
   unidades_map = {
       "Consolidado Geral (CD'S)": "CD'S",
       "BGU": "BGU",
@@ -84,7 +63,7 @@ try:
       header_row_idx = idx
       break
 
-  col_idx = 7
+  col_idx = 7  # Padrão CD'S (Coluna 7)
   if header_row_idx is not None:
     headers = [
         str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
@@ -111,36 +90,44 @@ try:
     return 0
 
   # LEITURA DOS DADOS
+  # 1. Fluxo de Cargas
   cargas_dia = get_metric_val("CARGAS DO DIA")
   cargas_d1 = get_metric_val("CARGAS EM D+1")
   pend_saida = get_metric_val("CARGAS PENDENTES DE SAÍDA")
   recargas_cam = get_metric_val("RECARGAS DE CAMINHÃO")
   recargas_hr = get_metric_val("RECARGAS DE HR")
 
+  # 2. Passivos
   tot_passivo = get_metric_val("TOTAL PASSIVO")
   pass_agend = get_metric_val("AGENDAMENTO")
   pass_rota = get_metric_val("ROTA")
   pass_sms = get_metric_val("SMS")
 
+  # 3. Gestão de Equipes
   eq_ativa = get_metric_val("EQUIPE ATIVA")
   eq_ferias = get_metric_val("EQUIPE DE FÉRIAS")
   absenteismo = get_metric_val("ABSENTEÍSMO")
   cap_equipes = get_metric_val("CAPACIDADE DE EQUIPES")
 
+  # 4. Composição da Frota
   baiado = get_metric_val("BAIADO")
   truck = get_metric_val("TRUCK")
   hr_frota = get_metric_val("HR")
 
+  # 5. Atendimento
   vol_total = get_metric_val("VOLUME TOTAL")
   qtd_clientes = get_metric_val("QDT CLIENTES")
 
+  # 6. Ocupação & Eficiência
   ocup_cam = get_metric_val("OCUPAÇÃO CAMINHÕES")
   ocup_cd = get_metric_val("OCUPAÇÃO CD")
   estudo_entrega = get_metric_val("ESTUDO DE ENTREGA")
 
+  # 7. Retorno
   ret_dia = get_metric_val("RETORNO DO DIA")
   ret_mes = get_metric_val("RETORNO DO MÊS")
 
+  # Tratamento de Porcentagens
   ocup_cam_pct = ocup_cam * 100 if 0 < ocup_cam <= 1 else ocup_cam
   ocup_cd_pct = ocup_cd * 100 if 0 < ocup_cd <= 1 else ocup_cd
   estudo_pct = (
@@ -158,8 +145,6 @@ try:
         xaxis=dict(fixedrange=True, title=""),
         yaxis=dict(fixedrange=True, title=""),
         dragmode=False,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
     fig.update_traces(textposition="outside", cliponaxis=False)
     return fig
@@ -168,9 +153,6 @@ try:
       "staticPlot": True,
       "responsive": True,
   }
-
-  # PALETAS COCA-COLA
-  # Vermelho Principal: #E41E2B, Preto: #1E1E1E, Cinza Escuro: #4A4A4A, Cinza Prata: #7F8C8D, Vermelho Claro: #FADBD8
 
   # ================= LINHA 1: OPERAÇÃO E PASSIVOS =================
   col_l1_1, col_l1_2 = st.columns(2)
@@ -200,11 +182,11 @@ try:
         color="Indicador",
         text_auto=True,
         color_discrete_sequence=[
-            "#E41E2B",
-            "#1E1E1E",
-            "#F39C12",
-            "#C0392B",
-            "#7F8C8D",
+            "#2E86C1",
+            "#28B463",
+            "#F1C40F",
+            "#E74C3C",
+            "#8E44AD",
         ],
     )
     st.plotly_chart(
@@ -230,7 +212,7 @@ try:
         y="Quantidade",
         color="Indicador",
         text_auto=True,
-        color_discrete_sequence=["#E41E2B", "#1E1E1E", "#7F8C8D", "#D35400"],
+        color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
     max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.3
     fig2.update_layout(yaxis_range=[0, max_passivo])
@@ -263,7 +245,7 @@ try:
         y="Quantidade",
         color="Indicador",
         text_auto=True,
-        color_discrete_sequence=["#1E1E1E", "#7F8C8D", "#E41E2B", "#D35400"],
+        color_discrete_sequence=["#27AE60", "#F39C12", "#C0392B", "#2980B9"],
     )
     st.plotly_chart(
         aplicar_estilo_grafico(fig3),
@@ -283,7 +265,7 @@ try:
         y="Quantidade",
         color="Veículo",
         text_auto=True,
-        color_discrete_sequence=["#E41E2B", "#1E1E1E", "#7F8C8D"],
+        color_discrete_sequence=["#16A085", "#2980B9", "#8E44AD"],
     )
     st.plotly_chart(
         aplicar_estilo_grafico(fig4),
@@ -309,7 +291,7 @@ try:
         y="Valor",
         color="Indicador",
         text="Texto",
-        color_discrete_sequence=["#E41E2B", "#1E1E1E"],
+        color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
     st.plotly_chart(
         aplicar_estilo_grafico(fig5),
@@ -338,7 +320,7 @@ try:
         y="Valor",
         color="Indicador",
         text="Texto",
-        color_discrete_sequence=["#E41E2B", "#1E1E1E", "#7F8C8D"],
+        color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
     fig6.update_layout(yaxis_range=[0, 100])
     st.plotly_chart(
@@ -360,7 +342,7 @@ try:
         y="Valor",
         color="Indicador",
         text="Texto",
-        color_discrete_sequence=["#E41E2B", "#1E1E1E"],
+        color_discrete_sequence=["#E74C3C", "#C0392B"],
     )
     st.plotly_chart(
         aplicar_estilo_grafico(fig7),
