@@ -28,78 +28,60 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Busca avançada por múltiplos termos possíveis na mesma linha
-  def buscar_valor_termos(termos, col_pos):
-    try:
-      for col_rotulo in [1, 2]:
-        col_str = raw_df.iloc[:, col_rotulo].astype(str).str.strip().str.upper()
-        for t in termos:
-          row_match = raw_df[col_str.str.contains(t.upper(), na=False)]
-          if not row_match.empty:
-            val = row_match.iloc[0, col_pos]
-            val_num = pd.to_numeric(val, errors="coerce")
-            if pd.notna(val_num):
-              return val_num
-      return 0
-    except:
-      return 0
-
-  # Identifica colunas das Unidades
-  header_row_idx = None
-  for idx, r in raw_df.iterrows():
-    row_vals = [str(v).strip().upper() for v in r.values]
-    if "SPA" in row_vals and "BGU" in row_vals:
-      header_row_idx = idx
-      break
-
-  if header_row_idx is not None:
-    headers = [
-        str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
-    ]
-    unidades_disponiveis = ["SPA", "FRIG", "NIG", "LST", "CJU", "BGU"]
-    cols_map = {}
-    for u in unidades_disponiveis:
-      cols_map[u] = headers.index(u) if u in headers else 8
-  else:
-    cols_map = {"SPA": 8, "FRIG": 7, "NIG": 6, "LST": 5, "CJU": 4, "BGU": 3}
+  # Mapeamento manual exato das colunas de Unidades (Aba padrão)
+  # Coluna 3 = BGU | 4 = CJU | 5 = LST | 6 = NIG | 7 = FRIG | 8 = SPA
+  unidades_map = {
+      "Consolidado Geral (SPA)": 8,
+      "SPA": 8,
+      "FRIG": 7,
+      "NIG": 6,
+      "LST": 5,
+      "CJU": 4,
+      "BGU": 3,
+  }
 
   unidade_sel = st.selectbox(
-      "🎯 Filtrar por Unidade:", ["Consolidado Geral"] + list(cols_map.keys())
+      "🎯 Filtrar por Unidade:", list(unidades_map.keys())
   )
+  col_idx = unidades_map[unidade_sel]
 
-  st.caption(f"📊 Exibindo dados em tempo real da aba: **{data_selecionada}**")
+  st.caption(f"📊 Exibindo dados da aba: **{data_selecionada}** | Coluna lida: **{unidade_sel}**")
   st.markdown("---")
 
-  col_idx = (
-      cols_map[unidade_sel]
-      if unidade_sel != "Consolidado Geral"
-      else cols_map["SPA"]
-  )
+  def extrair_valor_linha(termo_chave, col_pos):
+    for r_idx in range(len(raw_df)):
+      linha_texto = " ".join(raw_df.iloc[r_idx, :3].dropna().astype(str)).upper()
+      if termo_chave.upper() in linha_texto:
+        val = raw_df.iloc[r_idx, col_pos]
+        val_num = pd.to_numeric(val, errors="coerce")
+        return val_num if pd.notna(val_num) else 0
+    return 0
 
-  # KPIs
-  vol_total = buscar_valor_termos(["VOLUME TOTAL"], col_idx)
-  ocup_cam = buscar_valor_termos(["OCUPAÇÃO CAMINHÕES"], col_idx)
-  tot_passivo = buscar_valor_termos(["TOTAL PASSIVO"], col_idx)
-  ret_dia = buscar_valor_termos(["RETORNO DO DIA"], col_idx)
+  # Leitura das Métricas Principais (KPIs)
+  vol_total = extrair_valor_linha("VOLUME TOTAL", col_idx)
+  ocup_cam = extrair_valor_linha("OCUPAÇÃO CAMINHÕES", col_idx)
+  tot_passivo = extrair_valor_linha("TOTAL PASSIVO", col_idx)
+  ret_dia = extrair_valor_linha("RETORNO DO DIA", col_idx)
 
-  # Leitura com os nomes exatos das linhas da sua planilha
-  cargas_dia = buscar_valor_termos(["CARGAS DO DIA"], col_idx)
-  cargas_d1 = buscar_valor_termos(
-      ["TRANSFERÊNCIA", "TRANSFERENCIA", "D+1"], col_idx
-  )
-  pend_saida = buscar_valor_termos(
-      ["PENDENTES DE SAÍDA", "PENDENTES DE SAIDA"], col_idx
-  )
-  recargas_cam = buscar_valor_termos(["RECARGAS DO DIA"], col_idx)
-  recargas_hr = buscar_valor_termos(["HR"], col_idx)
+  # Leitura dos Indicadores das Barras
+  cargas_dia = extrair_valor_linha("CARGAS DO DIA", col_idx)
+  cargas_d1 = extrair_valor_linha("TRANSFERÊNCIA", col_idx)
+  if cargas_d1 == 0:
+    cargas_d1 = extrair_valor_linha("D+1", col_idx)
 
-  # Passivos
-  pass_agend = buscar_valor_termos(["AGENDAMENTO"], col_idx)
-  pass_rota = buscar_valor_termos(["ROTA"], col_idx)
-  pass_sms = buscar_valor_termos(["SMS"], col_idx)
+  pend_saida = extrair_valor_linha("PENDENTES DE SAÍDA", col_idx)
+  recargas_cam = extrair_valor_linha("RECARGAS DO DIA", col_idx)
+  recargas_hr = extrair_valor_linha("TRUCK", col_idx)
+  if recargas_hr == 0:
+    recargas_hr = extrair_valor_linha("HR", col_idx)
 
-  # Formatação KPIs
-  vol_fmt = f"{vol_total:,.0f} UC".replace(",", ".") if vol_total > 0 else "0 UC"
+  # Leitura dos Passivos
+  pass_agend = extrair_valor_linha("AGENDAMENTO", col_idx)
+  pass_rota = extrair_valor_linha("ROTA", col_idx)
+  pass_sms = extrair_valor_linha("SMS", col_idx)
+
+  # Formatação dos KPIs
+  vol_fmt = f"{vol_total:,.0f} UC".replace(",", ".") if vol_total > 0 else f"{vol_total}"
   ocup_fmt = f"{ocup_cam * 100:.1f}%" if 0 < ocup_cam <= 1 else f"{ocup_cam}%"
   ret_fmt = f"{ret_dia * 100:.2f}%" if 0 < ret_dia <= 1 else f"{ret_dia}%"
 
@@ -174,5 +156,9 @@ try:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
+  # Diagnóstico dos Dados
+  with st.expander("🔍 Clique aqui para conferir a tabela de dados extraída da planilha"):
+    st.dataframe(raw_df.dropna(how="all"))
+
 except Exception as e:
-  st.error(f"Erro ao ler os dados da planilha: {e}")
+  st.error(f"Erro ao processar a planilha: {e}")
