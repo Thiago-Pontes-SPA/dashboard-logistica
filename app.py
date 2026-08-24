@@ -16,17 +16,22 @@ try:
   # Filtra e captura todas as abas operacionais
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # IDENTIFICA A ÚLTIMA ABA COM DADOS PREENCHIDOS (ENCONTRANDO DA ÚLTIMA PARA A PRIMEIRA)
+  # IDENTIFICA A ÚLTIMA ABA QUE POSSUI VOLUME TOTAL OU CARGAS > 0
   padrao_idx = 0
   for idx in range(len(todas_abas) - 1, -1, -1):
     nome_aba = todas_abas[idx]
     try:
-      df_temp = pd.read_excel(excel_file, sheet_name=nome_aba, nrows=30)
-      # Converte para numérico e checa se há algum valor preenchido/maior que zero nas colunas de dados
-      valores_num = pd.to_numeric(
-          df_temp.iloc[:, 2:].values.flatten(), errors="coerce"
-      )
-      if (valores_num > 0).any():
+      df_temp = pd.read_excel(excel_file, sheet_name=nome_aba)
+      # Procura por linhas chave que confirmam preenchimento real
+      tem_dados = False
+      for r_idx in range(len(df_temp)):
+        rotulo = " ".join(df_temp.iloc[r_idx, :2].dropna().astype(str)).upper()
+        if "VOLUME TOTAL" in rotulo or "CARGAS DO DIA" in rotulo:
+          vals = pd.to_numeric(df_temp.iloc[r_idx, 2:], errors="coerce")
+          if (vals > 0).any():
+            tem_dados = True
+            break
+      if tem_dados:
         padrao_idx = idx
         break
     except:
