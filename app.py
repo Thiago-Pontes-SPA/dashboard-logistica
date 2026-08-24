@@ -28,22 +28,23 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Função flexível de busca por texto exato/parcial na 1ª ou 2ª coluna de rótulos
-  def buscar_valor_rotulo(termo_busca, col_pos):
+  # Busca avançada por múltiplos termos possíveis na mesma linha
+  def buscar_valor_termos(termos, col_pos):
     try:
-      # Procura na coluna B (índice 1) ou C (índice 2)
       for col_rotulo in [1, 2]:
         col_str = raw_df.iloc[:, col_rotulo].astype(str).str.strip().str.upper()
-        row_match = raw_df[col_str.str.contains(termo_busca.upper(), na=False)]
-        if not row_match.empty:
-          val = row_match.iloc[0, col_pos]
-          val_num = pd.to_numeric(val, errors="coerce")
-          return val_num if pd.notna(val_num) else 0
+        for t in termos:
+          row_match = raw_df[col_str.str.contains(t.upper(), na=False)]
+          if not row_match.empty:
+            val = row_match.iloc[0, col_pos]
+            val_num = pd.to_numeric(val, errors="coerce")
+            if pd.notna(val_num):
+              return val_num
       return 0
     except:
       return 0
 
-  # Identifica os nomes das colunas de Unidades (BGU, CJU, LST, NIG, FRIG, SPA)
+  # Identifica colunas das Unidades
   header_row_idx = None
   for idx, r in raw_df.iterrows():
     row_vals = [str(v).strip().upper() for v in r.values]
@@ -52,16 +53,13 @@ try:
       break
 
   if header_row_idx is not None:
-    headers = [str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values]
+    headers = [
+        str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
+    ]
     unidades_disponiveis = ["SPA", "FRIG", "NIG", "LST", "CJU", "BGU"]
-    
-    # Mapeia dinamicamente o índice real de cada coluna
     cols_map = {}
     for u in unidades_disponiveis:
-      if u in headers:
-        cols_map[u] = headers.index(u)
-      else:
-        cols_map[u] = 8 # fallback
+      cols_map[u] = headers.index(u) if u in headers else 8
   else:
     cols_map = {"SPA": 8, "FRIG": 7, "NIG": 6, "LST": 5, "CJU": 4, "BGU": 3}
 
@@ -72,30 +70,35 @@ try:
   st.caption(f"📊 Exibindo dados em tempo real da aba: **{data_selecionada}**")
   st.markdown("---")
 
-  col_idx = cols_map[unidade_sel] if unidade_sel != "Consolidado Geral" else cols_map["SPA"]
+  col_idx = (
+      cols_map[unidade_sel]
+      if unidade_sel != "Consolidado Geral"
+      else cols_map["SPA"]
+  )
 
-  # Extração de Métricas Principais (KPIs)
-  vol_total = buscar_valor_rotulo("VOLUME TOTAL", col_idx)
-  ocup_cam = buscar_valor_rotulo("OCUPAÇÃO CAMINHÕES", col_idx)
-  tot_passivo = buscar_valor_rotulo("TOTAL PASSIVO", col_idx)
-  ret_dia = buscar_valor_rotulo("RETORNO DO DIA", col_idx)
+  # KPIs
+  vol_total = buscar_valor_termos(["VOLUME TOTAL"], col_idx)
+  ocup_cam = buscar_valor_termos(["OCUPAÇÃO CAMINHÕES"], col_idx)
+  tot_passivo = buscar_valor_termos(["TOTAL PASSIVO"], col_idx)
+  ret_dia = buscar_valor_termos(["RETORNO DO DIA"], col_idx)
 
-  # Extração da Ordem Exata Solicitada para o Gráfico 1:
-  cargas_dia = buscar_valor_rotulo("CARGAS DO DIA", col_idx)
-  cargas_d1 = buscar_valor_rotulo("D+1", col_idx)
-  if cargas_d1 == 0:
-    cargas_d1 = buscar_valor_rotulo("TRANSFERÊNCIA", col_idx)
-    
-  pend_saida = buscar_valor_rotulo("PENDENTES DE SAÍDA", col_idx)
-  recargas_cam = buscar_valor_rotulo("RECARGAS DO DIA", col_idx)
-  recargas_hr = buscar_valor_rotulo("HR", col_idx)
+  # Leitura com os nomes exatos das linhas da sua planilha
+  cargas_dia = buscar_valor_termos(["CARGAS DO DIA"], col_idx)
+  cargas_d1 = buscar_valor_termos(
+      ["TRANSFERÊNCIA", "TRANSFERENCIA", "D+1"], col_idx
+  )
+  pend_saida = buscar_valor_termos(
+      ["PENDENTES DE SAÍDA", "PENDENTES DE SAIDA"], col_idx
+  )
+  recargas_cam = buscar_valor_termos(["RECARGAS DO DIA"], col_idx)
+  recargas_hr = buscar_valor_termos(["HR"], col_idx)
 
-  # Passivos por Tipo
-  pass_agend = buscar_valor_rotulo("AGENDAMENTO", col_idx)
-  pass_rota = buscar_valor_rotulo("ROTA", col_idx)
-  pass_sms = buscar_valor_rotulo("SMS", col_idx)
+  # Passivos
+  pass_agend = buscar_valor_termos(["AGENDAMENTO"], col_idx)
+  pass_rota = buscar_valor_termos(["ROTA"], col_idx)
+  pass_sms = buscar_valor_termos(["SMS"], col_idx)
 
-  # Formatação dos KPIs
+  # Formatação KPIs
   vol_fmt = f"{vol_total:,.0f} UC".replace(",", ".") if vol_total > 0 else "0 UC"
   ocup_fmt = f"{ocup_cam * 100:.1f}%" if 0 < ocup_cam <= 1 else f"{ocup_cam}%"
   ret_fmt = f"{ret_dia * 100:.2f}%" if 0 < ret_dia <= 1 else f"{ret_dia}%"
@@ -115,7 +118,7 @@ try:
 
   col_g1, col_g2 = st.columns(2)
 
-  # Gráfico 1: 5 colunas na ordem solicitada
+  # Gráfico 1
   with col_g1:
     st.subheader("📦 Visão Geral de Cargas")
     operacao_df = pd.DataFrame({
@@ -151,7 +154,7 @@ try:
     fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd. Cargas")
     st.plotly_chart(fig1, use_container_width=True)
 
-  # Gráfico 2: Passivos
+  # Gráfico 2
   with col_g2:
     st.subheader("🚨 Cargas no Passivo por Motivo")
     passivos_df = pd.DataFrame({
