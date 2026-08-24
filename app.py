@@ -13,27 +13,26 @@ excel_file = "61.xlsx"
 
 try:
   xls = pd.ExcelFile(excel_file)
-  # Filtra e captura todas as abas operacionais
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # IDENTIFICA A ÚLTIMA ABA QUE POSSUI VOLUME TOTAL OU CARGAS > 0
+  # Busca rápida e leve do último preenchimento lendo apenas a 1ª aba aberta do arquivo
   padrao_idx = 0
   for idx in range(len(todas_abas) - 1, -1, -1):
     nome_aba = todas_abas[idx]
     try:
-      df_temp = pd.read_excel(excel_file, sheet_name=nome_aba)
-      # Procura por linhas chave que confirmam preenchimento real
-      tem_dados = False
-      for r_idx in range(len(df_temp)):
-        rotulo = " ".join(df_temp.iloc[r_idx, :2].dropna().astype(str)).upper()
-        if "VOLUME TOTAL" in rotulo or "CARGAS DO DIA" in rotulo:
-          vals = pd.to_numeric(df_temp.iloc[r_idx, 2:], errors="coerce")
-          if (vals > 0).any():
-            tem_dados = True
-            break
-      if tem_dados:
-        padrao_idx = idx
-        break
+      df_check = pd.read_excel(
+          excel_file, sheet_name=nome_aba, nrows=25, usecols="A:H"
+      )
+      # Verifica se há dados na linha de Volume ou Cargas
+      contudo = " ".join(df_check.astype(str).values.flatten()).upper()
+      if "VOLUME TOTAL" in contudo or "CARGAS DO DIA" in contudo:
+        # Se os números forem válidos e diferentes de zero
+        nums = pd.to_numeric(
+            df_check.iloc[:, 2:].values.flatten(), errors="coerce"
+        )
+        if (nums > 0).any():
+          padrao_idx = idx
+          break
     except:
       continue
 
@@ -140,7 +139,6 @@ try:
   ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
   ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
 
-  # Estilo com eixos completamente travados para toque mobile
   def aplicar_estilo_grafico(fig, altura=300):
     fig.update_layout(
         height=altura,
