@@ -77,34 +77,46 @@ try:
         return val_num if pd.notna(val_num) else 0
     return 0
 
-  # LEITURA DOS DADOS
-  # Gráfico 1: Fluxo de Cargas
+  # --- LEITURA DOS DADOS ---
+
+  # 1. Fluxo de Cargas
   cargas_dia = get_metric_val("CARGAS DO DIA")
   cargas_d1 = get_metric_val("CARGAS EM D+1")
   pend_saida = get_metric_val("CARGAS PENDENTES DE SAÍDA")
   recargas_cam = get_metric_val("RECARGAS DE CAMINHÃO")
   recargas_hr = get_metric_val("RECARGAS DE HR")
 
-  # Gráfico 2: Passivos
+  # 2. Passivos
   tot_passivo = get_metric_val("TOTAL PASSIVO")
   pass_agend = get_metric_val("PASSIVO ( AGENDAMENTO )")
   pass_rota = get_metric_val("PASSIVO ( ROTA )")
   pass_sms = get_metric_val("PASSIVO ( SMS )")
 
-  # Gráfico 3: Atendimento
+  # 3. Gestão de Equipes
+  eq_ativa = get_metric_val("EQUIPE ATIVA")
+  eq_ferias = get_metric_val("EQUIPE DE FÉRIAS")
+  absenteismo = get_metric_val("ABSENTEÍSMO")
+  cap_equipes = get_metric_val("CAPACIDADE DE EQUIPES")
+
+  # 4. Composição da Frota
+  baiado = get_metric_val("BAIADO")
+  truck = get_metric_val("TRUCK")
+  hr_frota = get_metric_val("HR")
+
+  # 5. Atendimento
   vol_total = get_metric_val("VOLUME TOTAL")
   qtd_clientes = get_metric_val("QDT CLIENTES")
 
-  # Gráfico 4: Ocupação & Eficiência
+  # 6. Ocupação & Eficiência
   ocup_cam = get_metric_val("OCUPAÇÃO CAMINHÕES")
   ocup_cd = get_metric_val("OCUPAÇÃO CD")
   estudo_entrega = get_metric_val("ESTUDO DE ENTREGA")
 
-  # Gráfico 5: Retorno
+  # 7. Retorno
   ret_dia = get_metric_val("RETORNO DO DIA")
   ret_mes = get_metric_val("RETORNO DO MÊS")
 
-  # Tratamento de Porcentagens (converte 0.44 para 44%)
+  # Tratamento de Porcentagens
   ocup_cam_pct = ocup_cam * 100 if 0 < ocup_cam <= 1 else ocup_cam
   ocup_cd_pct = ocup_cd * 100 if 0 < ocup_cd <= 1 else ocup_cd
   estudo_pct = (
@@ -114,11 +126,11 @@ try:
   ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
   ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
 
-  # --- PRIMEIRA LINHA: 3 GRÁFICOS ---
-  col_a1, col_a2, col_a3 = st.columns(3)
+  # ================= LINHA 1: OPERAÇÃO E PASSIVOS (2 GRÁFICOS) =================
+  col_l1_1, col_l1_2 = st.columns(2)
 
   # GRÁFICO 1: FLUXO DE CARGAS
-  with col_a1:
+  with col_l1_1:
     st.subheader("📦 Visão Geral de Cargas")
     df_g1 = pd.DataFrame({
         "Indicador": [
@@ -154,7 +166,7 @@ try:
     st.plotly_chart(fig1, use_container_width=True)
 
   # GRÁFICO 2: PASSIVOS
-  with col_a2:
+  with col_l1_2:
     st.subheader("🚨 Passivos Operacionais")
     df_g2 = pd.DataFrame({
         "Indicador": [
@@ -176,36 +188,86 @@ try:
     fig2.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd.")
     st.plotly_chart(fig2, use_container_width=True)
 
-  # GRÁFICO 3: ATENDIMENTO
-  with col_a3:
-    st.subheader("🎯 Atendimento")
+  st.markdown("---")
+
+  # ================= LINHA 2: EQUIPES E FROTA (2 GRÁFICOS) =================
+  col_l2_1, col_l2_2 = st.columns(2)
+
+  # GRÁFICO 3: GESTÃO DE EQUIPES
+  with col_l2_1:
+    st.subheader("👥 Gestão de Equipes")
     df_g3 = pd.DataFrame({
+        "Indicador": [
+            "Equipes Ativas",
+            "Equipes de Férias",
+            "Absenteísmo",
+            "Capacidade de Equipes",
+        ],
+        "Quantidade": [eq_ativa, eq_ferias, absenteismo, cap_equipes],
+    })
+    fig3 = px.bar(
+        df_g3,
+        x="Indicador",
+        y="Quantidade",
+        color="Indicador",
+        text_auto=True,
+        color_discrete_sequence=["#27AE60", "#F39C12", "#C0392B", "#2980B9"],
+    )
+    fig3.update_layout(
+        showlegend=False, xaxis_title="", yaxis_title="Pessoas / Equipes"
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+
+  # GRÁFICO 4: COMPOSIÇÃO DA FROTA
+  with col_l2_2:
+    st.subheader("🚛 Composição da Frota")
+    df_g4 = pd.DataFrame({
+        "Veículo": ["Baiado", "Truck", "HR"],
+        "Quantidade": [baiado, truck, hr_frota],
+    })
+    fig4 = px.bar(
+        df_g4,
+        x="Veículo",
+        y="Quantidade",
+        color="Veículo",
+        text_auto=True,
+        color_discrete_sequence=["#16A085", "#2980B9", "#8E44AD"],
+    )
+    fig4.update_layout(
+        showlegend=False, xaxis_title="", yaxis_title="Qtd. Veículos"
+    )
+    st.plotly_chart(fig4, use_container_width=True)
+
+  st.markdown("---")
+
+  # ================= LINHA 3: ATENDIMENTO, OCUPAÇÃO E RETORNO (3 GRÁFICOS) =================
+  col_l3_1, col_l3_2, col_l3_3 = st.columns(3)
+
+  # GRÁFICO 5: ATENDIMENTO
+  with col_l3_1:
+    st.subheader("🎯 Atendimento")
+    df_g5 = pd.DataFrame({
         "Indicador": ["Volume total (UC)", "Quantidade de clientes"],
         "Valor": [vol_total, qtd_clientes],
         "Texto": [f"{vol_total:,.0f}".replace(",", "."), f"{qtd_clientes:,.0f}"],
     })
-    fig3 = px.bar(
-        df_g3,
+    fig5 = px.bar(
+        df_g5,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
-    fig3.update_layout(
+    fig5.update_layout(
         showlegend=False, xaxis_title="", yaxis_title="Quantidade"
     )
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig5, use_container_width=True)
 
-  st.markdown("---")
-
-  # --- SEGUNDA LINHA: 2 GRÁFICOS ---
-  col_b1, col_b2 = st.columns(2)
-
-  # GRÁFICO 4: OCUPAÇÃO & EFICIÊNCIA (%)
-  with col_b1:
-    st.subheader("🚛 Ocupação e Eficiência (%)")
-    df_g4 = pd.DataFrame({
+  # GRÁFICO 6: OCUPAÇÃO & EFICIÊNCIA (%)
+  with col_l3_2:
+    st.subheader("📊 Ocupação e Eficiência (%)")
+    df_g6 = pd.DataFrame({
         "Indicador": [
             "Ocupação dos caminhões",
             "Ocupação CD",
@@ -218,42 +280,42 @@ try:
             f"{estudo_pct:.1f}%",
         ],
     })
-    fig4 = px.bar(
-        df_g4,
+    fig6 = px.bar(
+        df_g6,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
-    fig4.update_layout(
+    fig6.update_layout(
         showlegend=False,
         xaxis_title="",
         yaxis_title="Porcentagem (%)",
         yaxis_range=[0, 100],
     )
-    st.plotly_chart(fig4, use_container_width=True)
+    st.plotly_chart(fig6, use_container_width=True)
 
-  # GRÁFICO 5: RETORNO (%)
-  with col_b2:
+  # GRÁFICO 7: RETORNO (%)
+  with col_l3_3:
     st.subheader("🔄 Percentual de Retorno (%)")
-    df_g5 = pd.DataFrame({
+    df_g7 = pd.DataFrame({
         "Indicador": ["Retorno Dia", "Retorno Mês"],
         "Valor": [ret_dia_pct, ret_mes_pct],
         "Texto": [f"{ret_dia_pct:.2f}%", f"{ret_mes_pct:.2f}%"],
     })
-    fig5 = px.bar(
-        df_g5,
+    fig7 = px.bar(
+        df_g7,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#E74C3C", "#C0392B"],
     )
-    fig5.update_layout(
+    fig7.update_layout(
         showlegend=False, xaxis_title="", yaxis_title="Porcentagem (%)"
     )
-    st.plotly_chart(fig5, use_container_width=True)
+    st.plotly_chart(fig7, use_container_width=True)
 
 except Exception as e:
   st.error(f"Erro ao processar os dados da planilha: {e}")
