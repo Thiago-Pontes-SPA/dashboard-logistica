@@ -13,13 +13,24 @@ excel_file = "61.xlsx"
 
 try:
   xls = pd.ExcelFile(excel_file)
+  # Filtra e captura todas as abas operacionais
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  padrao_idx = (
-      todas_abas.index("22.08.26")
-      if "22.08.26" in todas_abas
-      else len(todas_abas) - 1
-  )
+  # IDENTIFICA A ÚLTIMA ABA COM DADOS PREENCHIDOS (ENCONTRANDO DA ÚLTIMA PARA A PRIMEIRA)
+  padrao_idx = 0
+  for idx in range(len(todas_abas) - 1, -1, -1):
+    nome_aba = todas_abas[idx]
+    try:
+      df_temp = pd.read_excel(excel_file, sheet_name=nome_aba, nrows=30)
+      # Converte para numérico e checa se há algum valor preenchido/maior que zero nas colunas de dados
+      valores_num = pd.to_numeric(
+          df_temp.iloc[:, 2:].values.flatten(), errors="coerce"
+      )
+      if (valores_num > 0).any():
+        padrao_idx = idx
+        break
+    except:
+      continue
 
   st.sidebar.header("⚙️ Configurações")
   data_selecionada = st.sidebar.selectbox(
@@ -132,13 +143,12 @@ try:
         margin=dict(l=10, r=10, t=30, b=10),
         xaxis=dict(fixedrange=True, title=""),
         yaxis=dict(fixedrange=True, title=""),
-        dragmode=False,  # Impede seleção e zoom por gesto
+        dragmode=False,
     )
     return fig
 
-  # Configuração estática que desativa interferência de toque nos gráficos
   plotly_config = {
-      "staticPlot": True,  # Torna o gráfico 100% firme para rolagem de página
+      "staticPlot": True,
       "responsive": True,
   }
 
