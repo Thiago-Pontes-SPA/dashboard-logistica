@@ -1,3 +1,4 @@
+from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -12,25 +13,26 @@ st.subheader("Painel Executivo Diário")
 excel_file = "61.xlsx"
 
 
-# Leitura em cache para alta performance e zero travamento
-@st.cache_data(ttl=60)
-def carregar_dados_excel(file_path):
+@st.cache_data(ttl=300)
+def obter_lista_abas(file_path):
   xls = pd.ExcelFile(file_path)
-  todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
-
-  # Identifica a última aba com dados reais sem ler a planilha inteira repetidamente
-  aba_padrao_idx = len(todas_abas) - 1
-  for idx in range(len(todas_abas) - 1, -1, -1):
-    df_preview = pd.read_excel(file_path, sheet_name=todas_abas[idx], nrows=20)
-    if not df_preview.empty and df_preview.notna().sum().sum() > 5:
-      aba_padrao_idx = idx
-      break
-
-  return xls, todas_abas, aba_padrao_idx
+  return [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
 
 try:
-  xls, todas_abas, padrao_idx = carregar_dados_excel(excel_file)
+  todas_abas = obter_lista_abas(excel_file)
+
+  # Pega a data atual ou encontra a aba correspondente/mais próxima já preenchida
+  hoje_str = datetime.now().strftime("%d.%m.%2y")
+
+  padrao_idx = len(todas_abas) - 1
+  if hoje_str in todas_abas:
+    padrao_idx = todas_abas.index(hoje_str)
+  else:
+    # Se a data de hoje não estiver na lista, seleciona a última data válida até hoje
+    for idx, aba in enumerate(todas_abas):
+      if aba <= hoje_str:
+        padrao_idx = idx
 
   st.sidebar.header("⚙️ Configurações")
   data_selecionada = st.sidebar.selectbox(
