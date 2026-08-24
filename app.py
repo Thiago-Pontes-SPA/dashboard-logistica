@@ -28,7 +28,7 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Identificação dinâmica das colunas conforme o cabeçalho amarelo da foto
+  # Mapeamento das colunas da planilha
   header_row_idx = None
   for idx, r in raw_df.iterrows():
     row_vals = [str(v).strip().upper() for v in r.values]
@@ -36,7 +36,6 @@ try:
       header_row_idx = idx
       break
 
-  # Dicionário de colunas (BGU, CJU, LST, NIG, FRIG, SPA, CD'S)
   unidades_map = {
       "Consolidado Geral (CD'S)": "CD'S",
       "BGU": "BGU",
@@ -78,33 +77,49 @@ try:
         return val_num if pd.notna(val_num) else 0
     return 0
 
-  # --- GRÁFICO 1: OPERAÇÃO DE CARGAS ---
+  # LEITURA DOS DADOS
+  # Gráfico 1: Fluxo de Cargas
   cargas_dia = get_metric_val("CARGAS DO DIA")
   cargas_d1 = get_metric_val("CARGAS EM D+1")
   pend_saida = get_metric_val("CARGAS PENDENTES DE SAÍDA")
   recargas_cam = get_metric_val("RECARGAS DE CAMINHÃO")
   recargas_hr = get_metric_val("RECARGAS DE HR")
 
-  # --- GRÁFICO 2: DETALHAMENTO DE PASSIVOS ---
+  # Gráfico 2: Passivos
   tot_passivo = get_metric_val("TOTAL PASSIVO")
-  pass_agend = get_metric_val("AGENDAMENTO")
-  pass_rota = get_metric_val("ROTA")
-  pass_sms = get_metric_val("SMS")
+  pass_agend = get_metric_val("PASSIVO ( AGENDAMENTO )")
+  pass_rota = get_metric_val("PASSIVO ( ROTA )")
+  pass_sms = get_metric_val("PASSIVO ( SMS )")
 
-  # --- GRÁFICO 3: INDICADORES DE ATENDIMENTO E FROTA ---
-  ocup_cam = get_metric_val("OCUPAÇÃO CAMINHÕES")
+  # Gráfico 3: Atendimento
   vol_total = get_metric_val("VOLUME TOTAL")
   qtd_clientes = get_metric_val("QDT CLIENTES")
 
-  # Ajuste do percentual de ocupação
-  ocup_pct = ocup_cam * 100 if 0 < ocup_cam <= 1 else ocup_cam
+  # Gráfico 4: Ocupação & Eficiência
+  ocup_cam = get_metric_val("OCUPAÇÃO CAMINHÕES")
+  ocup_cd = get_metric_val("OCUPAÇÃO CD")
+  estudo_entrega = get_metric_val("ESTUDO DE ENTREGA")
 
-  # --- LAYOUT DOS 3 GRÁFICOS ---
-  col_g1, col_g2, col_g3 = st.columns(3)
+  # Gráfico 5: Retorno
+  ret_dia = get_metric_val("RETORNO DO DIA")
+  ret_mes = get_metric_val("RETORNO DO MÊS")
 
-  # GRÁFICO 1
-  with col_g1:
-    st.subheader("📦 Fluxo de Cargas")
+  # Tratamento de Porcentagens (converte 0.44 para 44%)
+  ocup_cam_pct = ocup_cam * 100 if 0 < ocup_cam <= 1 else ocup_cam
+  ocup_cd_pct = ocup_cd * 100 if 0 < ocup_cd <= 1 else ocup_cd
+  estudo_pct = (
+      estudo_entrega * 100 if 0 < estudo_entrega <= 1 else estudo_entrega
+  )
+
+  ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
+  ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
+
+  # --- PRIMEIRA LINHA: 3 GRÁFICOS ---
+  col_a1, col_a2, col_a3 = st.columns(3)
+
+  # GRÁFICO 1: FLUXO DE CARGAS
+  with col_a1:
+    st.subheader("📦 Visão Geral de Cargas")
     df_g1 = pd.DataFrame({
         "Indicador": [
             "Cargas do Dia",
@@ -138,8 +153,8 @@ try:
     fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd.")
     st.plotly_chart(fig1, use_container_width=True)
 
-  # GRÁFICO 2
-  with col_g2:
+  # GRÁFICO 2: PASSIVOS
+  with col_a2:
     st.subheader("🚨 Passivos Operacionais")
     df_g2 = pd.DataFrame({
         "Indicador": [
@@ -161,27 +176,84 @@ try:
     fig2.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd.")
     st.plotly_chart(fig2, use_container_width=True)
 
-  # GRÁFICO 3
-  with col_g3:
-    st.subheader("📈 Atendimento & Frota")
+  # GRÁFICO 3: ATENDIMENTO
+  with col_a3:
+    st.subheader("🎯 Atendimento")
     df_g3 = pd.DataFrame({
-        "Indicador": [
-            "Ocupação dos caminhões (%)",
-            "Volume total (UC)",
-            "Quantidade de clientes",
-        ],
-        "Valor": [ocup_pct, vol_total, qtd_clientes],
+        "Indicador": ["Volume total (UC)", "Quantidade de clientes"],
+        "Valor": [vol_total, qtd_clientes],
+        "Texto": [f"{vol_total:,.0f}".replace(",", "."), f"{qtd_clientes:,.0f}"],
     })
     fig3 = px.bar(
         df_g3,
         x="Indicador",
         y="Valor",
         color="Indicador",
-        text_auto=True,
-        color_discrete_sequence=["#16A085", "#2980B9", "#8E44AD"],
+        text="Texto",
+        color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
-    fig3.update_layout(showlegend=False, xaxis_title="", yaxis_title="Valor")
+    fig3.update_layout(
+        showlegend=False, xaxis_title="", yaxis_title="Quantidade"
+    )
     st.plotly_chart(fig3, use_container_width=True)
+
+  st.markdown("---")
+
+  # --- SEGUNDA LINHA: 2 GRÁFICOS ---
+  col_b1, col_b2 = st.columns(2)
+
+  # GRÁFICO 4: OCUPAÇÃO & EFICIÊNCIA (%)
+  with col_b1:
+    st.subheader("🚛 Ocupação e Eficiência (%)")
+    df_g4 = pd.DataFrame({
+        "Indicador": [
+            "Ocupação dos caminhões",
+            "Ocupação CD",
+            "Estudo de Entregas",
+        ],
+        "Valor": [ocup_cam_pct, ocup_cd_pct, estudo_pct],
+        "Texto": [
+            f"{ocup_cam_pct:.1f}%",
+            f"{ocup_cd_pct:.1f}%",
+            f"{estudo_pct:.1f}%",
+        ],
+    })
+    fig4 = px.bar(
+        df_g4,
+        x="Indicador",
+        y="Valor",
+        color="Indicador",
+        text="Texto",
+        color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
+    )
+    fig4.update_layout(
+        showlegend=False,
+        xaxis_title="",
+        yaxis_title="Porcentagem (%)",
+        yaxis_range=[0, 100],
+    )
+    st.plotly_chart(fig4, use_container_width=True)
+
+  # GRÁFICO 5: RETORNO (%)
+  with col_b2:
+    st.subheader("🔄 Percentual de Retorno (%)")
+    df_g5 = pd.DataFrame({
+        "Indicador": ["Retorno Dia", "Retorno Mês"],
+        "Valor": [ret_dia_pct, ret_mes_pct],
+        "Texto": [f"{ret_dia_pct:.2f}%", f"{ret_mes_pct:.2f}%"],
+    })
+    fig5 = px.bar(
+        df_g5,
+        x="Indicador",
+        y="Valor",
+        color="Indicador",
+        text="Texto",
+        color_discrete_sequence=["#E74C3C", "#C0392B"],
+    )
+    fig5.update_layout(
+        showlegend=False, xaxis_title="", yaxis_title="Porcentagem (%)"
+    )
+    st.plotly_chart(fig5, use_container_width=True)
 
 except Exception as e:
   st.error(f"Erro ao processar os dados da planilha: {e}")
