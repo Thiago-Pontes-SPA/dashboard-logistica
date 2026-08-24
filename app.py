@@ -22,14 +22,12 @@ def obter_lista_abas(file_path):
 try:
   todas_abas = obter_lista_abas(excel_file)
 
-  # Pega a data atual ou encontra a aba correspondente/mais próxima já preenchida
   hoje_str = datetime.now().strftime("%d.%m.%2y")
 
   padrao_idx = len(todas_abas) - 1
   if hoje_str in todas_abas:
     padrao_idx = todas_abas.index(hoje_str)
   else:
-    # Se a data de hoje não estiver na lista, seleciona a última data válida até hoje
     for idx, aba in enumerate(todas_abas):
       if aba <= hoje_str:
         padrao_idx = idx
@@ -41,7 +39,6 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Mapeamento das colunas da planilha
   header_row_idx = None
   for idx, r in raw_df.iterrows():
     row_vals = [str(v).strip().upper() for v in r.values]
@@ -63,7 +60,7 @@ try:
       "🎯 Filtrar por Unidade:", list(unidades_map.keys())
   )
 
-  col_idx = 7  # Padrão CD'S (Coluna 7)
+  col_idx = 7
   if header_row_idx is not None:
     headers = [
         str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
@@ -99,9 +96,9 @@ try:
 
   # 2. Passivos
   tot_passivo = get_metric_val("TOTAL PASSIVO")
-  pass_agend = get_metric_val("PASSIVO ( AGENDAMENTO )")
-  pass_rota = get_metric_val("PASSIVO ( ROTA )")
-  pass_sms = get_metric_val("PASSIVO ( SMS )")
+  pass_agend = get_metric_val("AGENDAMENTO")
+  pass_rota = get_metric_val("ROTA")
+  pass_sms = get_metric_val("SMS")
 
   # 3. Gestão de Equipes
   eq_ativa = get_metric_val("EQUIPE ATIVA")
@@ -146,7 +143,6 @@ try:
         yaxis=dict(fixedrange=True, title=""),
         dragmode=False,
     )
-    # FORÇA OS RÓTULOS/NÚMEROS A FICAREM FORA (ACIMA) DAS BARRAS
     fig.update_traces(textposition="outside", cliponaxis=False)
     return fig
 
@@ -215,7 +211,6 @@ try:
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
-    # Dá folga no topo do eixo Y para que o texto acima das barras pequenas (ex: 1 ou 2) apareça sem cortes
     max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.3
     fig2.update_layout(yaxis_range=[0, max_passivo])
 
