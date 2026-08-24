@@ -67,7 +67,6 @@ try:
   )
   st.markdown("---")
 
-  # Função de busca linha por linha
   def get_metric_val(termo_exato):
     for r_idx in range(len(raw_df)):
       rotulo = " ".join(raw_df.iloc[r_idx, :2].dropna().astype(str)).upper()
@@ -125,23 +124,23 @@ try:
   ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
   ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
 
-  # Função auxiliar para padronizar o visual, altura e interatividade limpa no mobile
-  def aplicar_estilo_grafico(fig, altura=320):
+  # Estilo com eixos completamente travados para toque mobile
+  def aplicar_estilo_grafico(fig, altura=300):
     fig.update_layout(
         height=altura,
         showlegend=False,
         margin=dict(l=10, r=10, t=30, b=10),
-        xaxis_title="",
-        yaxis_title="",
-        hoverlabel=dict(bgcolor="white", font_size=12),
-    )
-    fig.update_traces(
-        hovertemplate="<b>%{x}</b><br>Valor: %{y}<extra></extra>"
+        xaxis=dict(fixedrange=True, title=""),
+        yaxis=dict(fixedrange=True, title=""),
+        dragmode=False,  # Impede seleção e zoom por gesto
     )
     return fig
 
-  # Configuração para desativar a barra de ferramentas de zoom no celular
-  plotly_config = {"displayModeBar": False, "responsive": True}
+  # Configuração estática que desativa interferência de toque nos gráficos
+  plotly_config = {
+      "staticPlot": True,  # Torna o gráfico 100% firme para rolagem de página
+      "responsive": True,
+  }
 
   # ================= LINHA 1: OPERAÇÃO E PASSIVOS =================
   col_l1_1, col_l1_2 = st.columns(2)
@@ -279,9 +278,6 @@ try:
         text="Texto",
         color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
-    fig5.update_traces(
-        hovertemplate="<b>%{x}</b><br>Valor: %{text}<extra></extra>"
-    )
     st.plotly_chart(
         aplicar_estilo_grafico(fig5),
         use_container_width=True,
@@ -312,9 +308,6 @@ try:
         color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
     fig6.update_layout(yaxis_range=[0, 100])
-    fig6.update_traces(
-        hovertemplate="<b>%{x}</b><br>Percentual: %{text}<extra></extra>"
-    )
     st.plotly_chart(
         aplicar_estilo_grafico(fig6),
         use_container_width=True,
@@ -335,9 +328,6 @@ try:
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#E74C3C", "#C0392B"],
-    )
-    fig7.update_traces(
-        hovertemplate="<b>%{x}</b><br>Percentual: %{text}<extra></extra>"
     )
     st.plotly_chart(
         aplicar_estilo_grafico(fig7),
