@@ -7,7 +7,8 @@ st.set_page_config(
     page_title="Status Operacional Logística", page_icon="🚚", layout="wide"
 )
 
-st.title("🚚 Status Operacional de Logística - Gestão BCFNS ")
+# Título do Painel
+st.title("🚚 Status Operacional de Logística - Gestão BCFNS")
 st.subheader("Painel Executivo Diário")
 
 excel_file = "61.xlsx"
@@ -32,20 +33,7 @@ try:
       if aba <= hoje_str:
         padrao_idx = idx
 
-  st.sidebar.header("⚙️ Configurações")
-  data_selecionada = st.sidebar.selectbox(
-      "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
-  )
-
-  raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
-
-  header_row_idx = None
-  for idx, r in raw_df.iterrows():
-    row_vals = [str(v).strip().upper() for v in r.values]
-    if "SPA" in row_vals and "BGU" in row_vals:
-      header_row_idx = idx
-      break
-
+  # Mapeamento das unidades
   unidades_map = {
       "Consolidado Geral (CD'S)": "CD'S",
       "BGU": "BGU",
@@ -56,11 +44,26 @@ try:
       "SPA": "SPA",
   }
 
+  # ================= CAIXAS DE FILTRO NO CORPO PRINCIPAL =================
   unidade_sel = st.selectbox(
       "🎯 Filtrar por Unidade:", list(unidades_map.keys())
   )
 
-  col_idx = 7
+  data_selecionada = st.selectbox(
+      "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
+  )
+  # =======================================================================
+
+  raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
+
+  header_row_idx = None
+  for idx, r in raw_df.iterrows():
+    row_vals = [str(v).strip().upper() for v in r.values]
+    if "SPA" in row_vals and "BGU" in row_vals:
+      header_row_idx = idx
+      break
+
+  col_idx = 7  # Padrão CD'S (Coluna 7)
   if header_row_idx is not None:
     headers = [
         str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
