@@ -11,30 +11,26 @@ st.subheader("Painel Executivo Diário")
 
 excel_file = "61.xlsx"
 
-try:
-  xls = pd.ExcelFile(excel_file)
+
+# Leitura em cache para alta performance e zero travamento
+@st.cache_data(ttl=60)
+def carregar_dados_excel(file_path):
+  xls = pd.ExcelFile(file_path)
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # Busca rápida e leve do último preenchimento lendo apenas a 1ª aba aberta do arquivo
-  padrao_idx = 0
+  # Identifica a última aba com dados reais sem ler a planilha inteira repetidamente
+  aba_padrao_idx = len(todas_abas) - 1
   for idx in range(len(todas_abas) - 1, -1, -1):
-    nome_aba = todas_abas[idx]
-    try:
-      df_check = pd.read_excel(
-          excel_file, sheet_name=nome_aba, nrows=25, usecols="A:H"
-      )
-      # Verifica se há dados na linha de Volume ou Cargas
-      contudo = " ".join(df_check.astype(str).values.flatten()).upper()
-      if "VOLUME TOTAL" in contudo or "CARGAS DO DIA" in contudo:
-        # Se os números forem válidos e diferentes de zero
-        nums = pd.to_numeric(
-            df_check.iloc[:, 2:].values.flatten(), errors="coerce"
-        )
-        if (nums > 0).any():
-          padrao_idx = idx
-          break
-    except:
-      continue
+    df_preview = pd.read_excel(file_path, sheet_name=todas_abas[idx], nrows=20)
+    if not df_preview.empty and df_preview.notna().sum().sum() > 5:
+      aba_padrao_idx = idx
+      break
+
+  return xls, todas_abas, aba_padrao_idx
+
+
+try:
+  xls, todas_abas, padrao_idx = carregar_dados_excel(excel_file)
 
   st.sidebar.header("⚙️ Configurações")
   data_selecionada = st.sidebar.selectbox(
