@@ -141,11 +141,13 @@ try:
     fig.update_layout(
         height=altura,
         showlegend=False,
-        margin=dict(l=10, r=10, t=30, b=10),
+        margin=dict(l=10, r=10, t=35, b=10),
         xaxis=dict(fixedrange=True, title=""),
         yaxis=dict(fixedrange=True, title=""),
         dragmode=False,
     )
+    # FORÇA OS RÓTULOS/NÚMEROS A FICAREM FORA (ACIMA) DAS BARRAS
+    fig.update_traces(textposition="outside", cliponaxis=False)
     return fig
 
   plotly_config = {
@@ -213,6 +215,10 @@ try:
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
+    # Dá folga no topo do eixo Y para que o texto acima das barras pequenas (ex: 1 ou 2) apareça sem cortes
+    max_passivo = max(tot_passivo, pass_agend, pass_rota, pass_sms, 5) * 1.3
+    fig2.update_layout(yaxis_range=[0, max_passivo])
+
     st.plotly_chart(
         aplicar_estilo_grafico(fig2),
         use_container_width=True,
