@@ -28,41 +28,22 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Mapeamento exato das colunas conforme a foto da planilha:
-  # BGU=1 | CJU=2 | LST=3 | NIG=4 | FRIG=5 | SPA=6 | CD'S (Consolidado)=7
-  unidades_map = {
-      "Consolidado Geral (CD'S)": "CD'S",
-      "BGU": "BGU",
-      "CJU": "CJU",
-      "LST": "LST",
-      "NIG": "NIG",
-      "FRIG": "FRIG",
-      "SPA": "SPA",
+  # Mapeamento por índice de coluna conforme a imagem da planilha:
+  # Col 1=BGU | Col 2=CJU | Col 3=LST | Col 4=NIG | Col 5=FRIG | Col 6=SPA | Col 7=CD'S
+  unidades_cols = {
+      "Consolidado Geral (CD'S)": 7,
+      "BGU": 1,
+      "CJU": 2,
+      "LST": 3,
+      "NIG": 4,
+      "FRIG": 5,
+      "SPA": 6,
   }
 
   unidade_sel = st.selectbox(
-      "🎯 Filtrar por Unidade:", list(unidades_map.keys())
+      "🎯 Filtrar por Unidade:", list(unidades_cols.keys())
   )
-
-  # Encontra a linha de cabeçalho onde estão as siglas das unidades
-  header_row_idx = None
-  for idx, r in raw_df.iterrows():
-    row_vals = [str(v).strip().upper() for v in r.values]
-    if "SPA" in row_vals and "BGU" in row_vals:
-      header_row_idx = idx
-      break
-
-  # Descobre o índice numérico real da coluna selecionada
-  col_idx = 7  # Padrão CD'S
-  if header_row_idx is not None:
-    headers = [
-        str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
-    ]
-    alvo = unidades_map[unidade_sel].upper()
-    for i, h in enumerate(headers):
-      if alvo in h or h in alvo:
-        col_idx = i
-        break
+  col_idx = unidades_cols[unidade_sel]
 
   st.caption(
       f"📊 Exibindo dados da aba: **{data_selecionada}** | Unidade:"
@@ -70,34 +51,35 @@ try:
   )
   st.markdown("---")
 
-  def buscar_valor_exato(nome_linha):
-    for r_idx in range(len(raw_df)):
-      rotulo = str(raw_df.iloc[r_idx, 0]).strip().upper()
-      if rotulo == "":
-        rotulo = str(raw_df.iloc[r_idx, 1]).strip().upper()
-      if nome_linha.upper() in rotulo:
-        val = raw_df.iloc[r_idx, col_idx]
+  # Função de busca por palavra-chave sem falhar por célula dividida
+  def get_val(termo_busca):
+    for idx_linha in range(len(raw_df)):
+      texto_linha = " ".join(
+          raw_df.iloc[idx_linha, :2].dropna().astype(str)
+      ).upper()
+      if termo_busca.upper() in texto_linha:
+        val = raw_df.iloc[idx_linha, col_idx]
         val_num = pd.to_numeric(val, errors="coerce")
         return val_num if pd.notna(val_num) else 0
     return 0
 
-  # Extração dos KPIs
-  vol_total = buscar_valor_exato("VOLUME TOTAL")
-  ocup_cam = buscar_valor_exato("OCUPAÇÃO CAMINHÕES")
-  tot_passivo = buscar_valor_exato("TOTAL PASSIVO")
-  ret_dia = buscar_valor_exato("RETORNO DO DIA")
+  # Métricas Principais (KPIs)
+  vol_total = get_val("VOLUME TOTAL")
+  ocup_cam = get_val("OCUPAÇÃO CAMINHÕES")
+  tot_passivo = get_val("TOTAL PASSIVO")
+  ret_dia = get_val("RETORNO DO DIA")
 
-  # Extração dos 5 Indicadores das Barras
-  cargas_dia = buscar_valor_exato("CARGAS DO DIA")
-  cargas_d1 = buscar_valor_exato("CARGAS EM D+1")
-  pend_saida = buscar_valor_exato("CARGAS PENDENTES DE SAÍDA")
-  recargas_cam = buscar_valor_exato("RECARGAS DE CAMINHÃO")
-  recargas_hr = buscar_valor_exato("RECARGAS DE HR")
+  # Gráfico 1 - 5 Indicadores
+  cargas_dia = get_val("CARGAS DO DIA")
+  cargas_d1 = get_val("CARGAS EM D+1")
+  pend_saida = get_val("PENDENTES DE SAÍDA")
+  recargas_cam = get_val("RECARGAS DE CAMINHÃO")
+  recargas_hr = get_val("RECARGAS DE HR")
 
-  # Extração dos Passivos
-  pass_agend = buscar_valor_exato("PASSIVO ( AGENDAMENTO )")
-  pass_rota = buscar_valor_exato("PASSIVO ( ROTA )")
-  pass_sms = buscar_valor_exato("PASSIVO ( SMS )")
+  # Gráfico 2 - Passivos
+  pass_agend = get_val("AGENDAMENTO")
+  pass_rota = get_val("ROTA")
+  pass_sms = get_val("SMS")
 
   # Formatação KPIs
   vol_fmt = (
@@ -121,7 +103,7 @@ try:
 
   col_g1, col_g2 = st.columns(2)
 
-  # Gráfico 1: 5 Colunas
+  # Gráfico 1: Visão Geral de Cargas
   with col_g1:
     st.subheader("📦 Visão Geral de Cargas")
     operacao_df = pd.DataFrame({
