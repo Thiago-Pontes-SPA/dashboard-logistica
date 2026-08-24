@@ -44,19 +44,11 @@ try:
   st.caption(f"📊 Exibindo dados em tempo real da aba: **{data_selecionada}**")
   st.markdown("---")
 
-  def get_metric(metric_name, col_idx):
+  def get_by_index(row_idx, col_idx):
     try:
-      row = raw_df[
-          raw_df.iloc[:, 1]
-          .astype(str)
-          .str.upper()
-          .str.contains(metric_name.upper(), na=False)
-      ]
-      if not row.empty:
-        val = row.iloc[0, col_idx]
-        val_num = pd.to_numeric(val, errors="coerce")
-        return val_num if pd.notna(val_num) else 0
-      return 0
+      val = raw_df.iloc[row_idx, col_idx]
+      val_num = pd.to_numeric(val, errors="coerce")
+      return val_num if pd.notna(val_num) else 0
     except:
       return 0
 
@@ -66,29 +58,23 @@ try:
       else unidades_map["SPA"]
   )
 
-  # Métricas Principais (KPIs)
-  vol_total = get_metric("Volume total", col_idx)
-  ocup_cam = get_metric("Ocupação caminhões", col_idx)
-  tot_passivo = get_metric("Total passivo", col_idx)
-  ret_dia = get_metric("Retorno do dia", col_idx)
+  # Métricas Principais
+  vol_total = get_by_index(15, col_idx)
+  ocup_cam = get_by_index(14, col_idx)
+  tot_passivo = get_by_index(11, col_idx)
+  ret_dia = get_by_index(12, col_idx)
 
-  # Dados do Novo Gráfico Unificado (Pendentes, D+1, Recargas)
-  cargas_pend = get_metric("pendentes de saída", col_idx)
-  cargas_d1 = get_metric("D+1", col_idx)
-  recargas = get_metric("Recargas do dia", col_idx)
+  # 1. Leitura Direta do Fluxo de Cargas nas Linhas
+  cargas_dia = get_by_index(5, col_idx)  # Cargas do dia
+  cargas_d1 = get_by_index(18, col_idx)  # Transferência / D+1
+  pend_saida = get_by_index(6, col_idx)  # Cargas pendentes de saída
+  recargas_cam = get_by_index(7, col_idx)  # Recargas do dia (Caminhão)
+  recargas_hr = get_by_index(4, col_idx)  # Recargas HR
 
-  # Dados do Gráfico de Passivos por Tipo
-  pass_agend = get_metric("Agendamento", col_idx)
-  pass_rota = get_metric("Rota", col_idx)
-  pass_sms = get_metric("SMS", col_idx)
-
-  # Absenteísmo
-  absenteismo_row = raw_df[
-      raw_df.iloc[:, 1].astype(str).str.contains("Absenteísmo", na=False)
-  ]
-  absenteismo = (
-      absenteismo_row.iloc[0, col_idx] if not absenteismo_row.empty else 0
-  )
+  # 2. Passivos por Tipo
+  pass_agend = get_by_index(8, col_idx)
+  pass_rota = get_by_index(9, col_idx)
+  pass_sms = get_by_index(10, col_idx)
 
   # Formatação KPIs
   vol_fmt = (
@@ -97,7 +83,7 @@ try:
   ocup_fmt = f"{ocup_cam * 100:.1f}%" if 0 < ocup_cam <= 1 else f"{ocup_cam}%"
   ret_fmt = f"{ret_dia * 100:.2f}%" if 0 < ret_dia <= 1 else f"{ret_dia}%"
 
-  # Cards Superiores
+  # Cards
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.metric(label="📦 Volume Total", value=vol_fmt)
@@ -112,12 +98,24 @@ try:
 
   col_g1, col_g2 = st.columns(2)
 
-  # Gráfico 1: Pendentes, D+1 e Recargas
+  # Gráfico 1: 5 Colunas solicitadas na ordem
   with col_g1:
-    st.subheader("📋 Pendentes, D+1 e Recargas")
+    st.subheader("📦 Visão Geral de Cargas")
     operacao_df = pd.DataFrame({
-        "Indicador": ["Pendentes de Saída", "Cargas D+1", "Recargas do Dia"],
-        "Quantidade": [cargas_pend, cargas_d1, recargas],
+        "Indicador": [
+            "Cargas do dia",
+            "D+1",
+            "Pendentes de saída",
+            "Recargas de Caminhão",
+            "Recargas HR",
+        ],
+        "Quantidade": [
+            cargas_dia,
+            cargas_d1,
+            pend_saida,
+            recargas_cam,
+            recargas_hr,
+        ],
     })
     fig1 = px.bar(
         operacao_df,
@@ -125,12 +123,18 @@ try:
         y="Quantidade",
         color="Indicador",
         text_auto=True,
-        color_discrete_sequence=["#F1C40F", "#3498DB", "#E74C3C"],
+        color_discrete_sequence=[
+            "#2E86C1",
+            "#28B463",
+            "#F1C40F",
+            "#E74C3C",
+            "#8E44AD",
+        ],
     )
     fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Qtd. Cargas")
     st.plotly_chart(fig1, use_container_width=True)
 
-  # Gráfico 2: Cargas no Passivo por Motivo
+  # Gráfico 2: Cargas no Passivo
   with col_g2:
     st.subheader("🚨 Cargas no Passivo por Motivo")
     passivos_df = pd.DataFrame({
@@ -150,9 +154,5 @@ try:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-  # Informação de Absenteísmo
-  if pd.notna(absenteismo) and str(absenteismo) != "0":
-    st.info(f"💡 **Absenteísmo do Dia ({unidade_sel}):** {absenteismo}")
-
 except Exception as e:
-  st.error(f"Aguardando sincronização de dados: {e}")
+  st.error(f"Aguardando leitura dos dados: {e}")
