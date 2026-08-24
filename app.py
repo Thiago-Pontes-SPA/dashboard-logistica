@@ -13,10 +13,8 @@ excel_file = "61.xlsx"
 
 try:
   xls = pd.ExcelFile(excel_file)
-  # Seleciona abas ignorando bases
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # Define por padrão a aba '31.10' se existir, senão a última da lista
   padrao_idx = (
       todas_abas.index("31.10")
       if "31.10" in todas_abas
@@ -28,7 +26,6 @@ try:
       "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
   )
 
-  # Carrega a aba selecionada no menu
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
   unidades_map = {
@@ -47,14 +44,19 @@ try:
   st.caption(f"📊 Exibindo dados em tempo real da aba: **{data_selecionada}**")
   st.markdown("---")
 
+  # Função aprimorada para buscar valores numéricos com segurança
   def get_metric(metric_name, col_idx):
     try:
       row = raw_df[
-          raw_df.iloc[:, 1].astype(str).str.contains(metric_name, na=False)
+          raw_df.iloc[:, 1]
+          .astype(str)
+          .str.upper()
+          .str.contains(metric_name.upper(), na=False)
       ]
       if not row.empty:
         val = row.iloc[0, col_idx]
-        return val if pd.notna(val) else 0
+        val_num = pd.to_numeric(val, errors="coerce")
+        return val_num if pd.notna(val_num) else 0
       return 0
     except:
       return 0
@@ -65,58 +67,50 @@ try:
       else unidades_map["SPA"]
   )
 
-  # Métricas Principais (KPIs)
+  # Métricas
   vol_total = get_metric("Volume total", col_idx)
   ocup_cam = get_metric("Ocupação caminhões", col_idx)
   tot_passivo = get_metric("Total passivo", col_idx)
   ret_dia = get_metric("Retorno do dia", col_idx)
 
-  # Dados de Cargas
+  # Cargas
   cargas_dia = get_metric("Cargas do dia", col_idx)
   cargas_pend = get_metric("Cargas pendentes", col_idx)
   recargas = get_metric("Recargas do dia", col_idx)
 
-  # Dados dos Passivos por Tipo
-  pass_agend = get_metric("Passivo ( Agendamento", col_idx)
-  pass_rota = get_metric("Passivo ( Rota )", col_idx)
-  pass_sms = get_metric("Passivo ( SMS", col_idx)
+  # Passivos por tipo
+  pass_agend = get_metric("Agendamento", col_idx)
+  pass_rota = get_metric("Rota", col_idx)
+  pass_sms = get_metric("SMS", col_idx)
 
-  absenteismo = get_metric("Absenteísmo", col_idx)
+  absenteismo_row = raw_df[
+      raw_df.iloc[:, 1].astype(str).str.contains("Absenteísmo", na=False)
+  ]
+  absenteismo = (
+      absenteismo_row.iloc[0, col_idx] if not absenteismo_row.empty else 0
+  )
 
-  # Formatação dos KPIs
+  # Formatação KPIs
   vol_fmt = (
-      f"{vol_total:,.0f} UC".replace(",", ".")
-      if isinstance(vol_total, (int, float)) and vol_total > 0
-      else str(vol_total)
+      f"{vol_total:,.0f} UC".replace(",", ".") if vol_total > 0 else "0 UC"
   )
-  ocup_fmt = (
-      f"{ocup_cam * 100:.1f}%"
-      if isinstance(ocup_cam, (int, float)) and 0 < ocup_cam <= 1
-      else f"{ocup_cam}%"
-  )
-  ret_fmt = (
-      f"{ret_dia * 100:.2f}%"
-      if isinstance(ret_dia, (int, float)) and 0 < ret_dia <= 1
-      else f"{ret_dia}%"
-  )
+  ocup_fmt = f"{ocup_cam * 100:.1f}%" if 0 < ocup_cam <= 1 else f"{ocup_cam}%"
+  ret_fmt = f"{ret_dia * 100:.2f}%" if 0 < ret_dia <= 1 else f"{ret_dia}%"
 
-  # Exibição dos Cards Superiores
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.metric(label="📦 Volume Total", value=vol_fmt)
   with col2:
     st.metric(label="🚛 Ocupação Caminhões", value=ocup_fmt)
   with col3:
-    st.metric(label="⚠️ Total Passivo", value=f"{tot_passivo} cargas")
+    st.metric(label="⚠️ Total Passivo", value=f"{int(tot_passivo)} cargas")
   with col4:
     st.metric(label="🔄 Retorno do Dia", value=ret_fmt)
 
   st.markdown("---")
 
-  # Gráficos Dinâmicos
   col_g1, col_g2 = st.columns(2)
 
-  # Gráfico 1: Visão Geral de Cargas
   with col_g1:
     st.subheader("📦 Visão Geral de Cargas do Dia")
     cargas_df = pd.DataFrame({
@@ -134,7 +128,6 @@ try:
     fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Cargas")
     st.plotly_chart(fig1, use_container_width=True)
 
-  # Gráfico 2: Detalhamento do Passivo (Quantidade e Tipos)
   with col_g2:
     st.subheader("🚨 Cargas no Passivo por Motivo")
     passivos_df = pd.DataFrame({
@@ -154,8 +147,7 @@ try:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-  # Alerta de Absenteísmo
-  if absenteismo and str(absenteismo) != "0":
+  if pd.notna(absenteismo) and str(absenteismo) != "0":
     st.info(f"💡 **Absenteísmo do Dia ({unidade_sel}):** {absenteismo}")
 
 except Exception as e:
