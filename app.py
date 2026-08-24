@@ -13,7 +13,7 @@ st.subheader("Painel Executivo Diário")
 excel_file = "61.xlsx"
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def obter_lista_abas(file_path):
   xls = pd.ExcelFile(file_path)
   return [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
@@ -22,8 +22,17 @@ def obter_lista_abas(file_path):
 try:
   todas_abas = obter_lista_abas(excel_file)
 
-  # Padrão: Seleciona a última aba com dados preenchidos
+  # Pega a data atual ou encontra a aba correspondente/mais próxima já preenchida
+  hoje_str = datetime.now().strftime("%d.%m.%2y")
+
   padrao_idx = len(todas_abas) - 1
+  if hoje_str in todas_abas:
+    padrao_idx = todas_abas.index(hoje_str)
+  else:
+    # Se a data de hoje não estiver na lista, seleciona a última data válida até hoje
+    for idx, aba in enumerate(todas_abas):
+      if aba <= hoje_str:
+        padrao_idx = idx
 
   st.sidebar.header("⚙️ Configurações")
   data_selecionada = st.sidebar.selectbox(
@@ -32,24 +41,38 @@ try:
 
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
-  # Mapeamento fixo das colunas conforme a estrutura física da foto da planilha:
-  # Coluna 1: BGU | 2: CJU | 3: LST | 4: NIG | 5: FRIG | 6: SPA | 7: CD'S
+  # Mapeamento das colunas da planilha
+  header_row_idx = None
+  for idx, r in raw_df.iterrows():
+    row_vals = [str(v).strip().upper() for v in r.values]
+    if "SPA" in row_vals and "BGU" in row_vals:
+      header_row_idx = idx
+      break
+
   unidades_map = {
-      "Consolidado Geral (CD'S)": 7,
-      "BGU": 1,
-      "CJU": 2,
-      "LST": 3,
-      "NIG": 4,
-      "FRIG": 5,
-      "SPA": 6,
+      "Consolidado Geral (CD'S)": "CD'S",
+      "BGU": "BGU",
+      "CJU": "CJU",
+      "LST": "LST",
+      "NIG": "NIG",
+      "FRIG": "FRIG",
+      "SPA": "SPA",
   }
 
   unidade_sel = st.selectbox(
-      "🎯 Filtrar por Unidade:",
-      list(unidades_map.keys()),
-      key="filtro_unidades_main",
+      "🎯 Filtrar por Unidade:", list(unidades_map.keys())
   )
-  col_idx = unidades_map[unidade_sel]
+
+  col_idx = 7  # Padrão CD'S (Coluna 7)
+  if header_row_idx is not None:
+    headers = [
+        str(v).strip().upper() for v in raw_df.iloc[header_row_idx].values
+    ]
+    alvo = unidades_map[unidade_sel].upper()
+    for i, h in enumerate(headers):
+      if alvo == h or (alvo in h and len(h) <= 5):
+        col_idx = i
+        break
 
   st.caption(
       f"📊 Exibindo dados da aba: **{data_selecionada}** | Unidade:"
@@ -57,64 +80,54 @@ try:
   )
   st.markdown("---")
 
-  # Busca ultra-precisa garantindo que encontra a linha exata independente do espaço/má-formatação
-  def get_val_linha(termo_busca):
+  def get_metric_val(termo_exato):
     for r_idx in range(len(raw_df)):
-      linha_texto = (
-          " ".join(raw_df.iloc[r_idx, :2].dropna().astype(str))
-          .upper()
-          .replace(" ", "")
-      )
-      termo_limpo = termo_busca.upper().replace(" ", "")
-      if termo_limpo in linha_texto:
+      rotulo = " ".join(raw_df.iloc[r_idx, :2].dropna().astype(str)).upper()
+      if termo_exato.upper() in rotulo:
         val = raw_df.iloc[r_idx, col_idx]
         val_num = pd.to_numeric(val, errors="coerce")
         return val_num if pd.notna(val_num) else 0
     return 0
 
-  # LEITURA FIEL DA PLANILHA
-  # 1. Visão Geral de Cargas
-  cargas_dia = get_val_linha("CARGAS DO DIA")
-  cargas_d1 = get_val_linha("CARGAS EM D+1")
-  pend_saida = get_val_linha("CARGAS PENDENTES DE SAÍDA")
-  recargas_cam = get_val_linha("RECARGAS DE CAMINHÃO")
-  recargas_hr = get_val_linha("RECARGAS DE HR")
+  # LEITURA DOS DADOS
+  # 1. Fluxo de Cargas
+  cargas_dia = get_metric_val("CARGAS DO DIA")
+  cargas_d1 = get_metric_val("CARGAS EM D+1")
+  pend_saida = get_metric_val("CARGAS PENDENTES DE SAÍDA")
+  recargas_cam = get_metric_val("RECARGAS DE CAMINHÃO")
+  recargas_hr = get_metric_val("RECARGAS DE HR")
 
-  # 2. Passivos Operacionais
-  pass_agend = get_val_linha("PASSIVO ( AGENDAMENTO )")
-  pass_rota = get_val_linha("PASSIVO ( ROTA )")
-  pass_sms = get_val_linha("PASSIVO ( SMS )")
-  tot_passivo = (
-      get_val_linha("TOTAL PASSIVO")
-      if get_val_linha("TOTAL PASSIVO") > 0
-      else (pass_agend + pass_rota + pass_sms)
-  )
+  # 2. Passivos
+  tot_passivo = get_metric_val("TOTAL PASSIVO")
+  pass_agend = get_metric_val("PASSIVO ( AGENDAMENTO )")
+  pass_rota = get_metric_val("PASSIVO ( ROTA )")
+  pass_sms = get_metric_val("PASSIVO ( SMS )")
 
   # 3. Gestão de Equipes
-  eq_ativa = get_val_linha("EQUIPE ATIVA")
-  eq_ferias = get_val_linha("EQUIPE DE FÉRIAS")
-  absenteismo = get_val_linha("ABSENTEÍSMO")
-  cap_equipes = get_val_linha("CAPACIDADE DE EQUIPES")
+  eq_ativa = get_metric_val("EQUIPE ATIVA")
+  eq_ferias = get_metric_val("EQUIPE DE FÉRIAS")
+  absenteismo = get_metric_val("ABSENTEÍSMO")
+  cap_equipes = get_metric_val("CAPACIDADE DE EQUIPES")
 
   # 4. Composição da Frota
-  baiado = get_val_linha("BAIADO")
-  truck = get_val_linha("TRUCK")
-  hr_frota = get_val_linha("HR")
+  baiado = get_metric_val("BAIADO")
+  truck = get_metric_val("TRUCK")
+  hr_frota = get_metric_val("HR")
 
   # 5. Atendimento
-  vol_total = get_val_linha("VOLUME TOTAL")
-  qtd_clientes = get_val_linha("QDT CLIENTES")
+  vol_total = get_metric_val("VOLUME TOTAL")
+  qtd_clientes = get_metric_val("QDT CLIENTES")
 
   # 6. Ocupação & Eficiência
-  ocup_cam = get_val_linha("OCUPAÇÃO CAMINHÕES")
-  ocup_cd = get_val_linha("OCUPAÇÃO CD")
-  estudo_entrega = get_val_linha("ESTUDO DE ENTREGA")
+  ocup_cam = get_metric_val("OCUPAÇÃO CAMINHÕES")
+  ocup_cd = get_metric_val("OCUPAÇÃO CD")
+  estudo_entrega = get_metric_val("ESTUDO DE ENTREGA")
 
   # 7. Retorno
-  ret_dia = get_val_linha("RETORNO DO DIA")
-  ret_mes = get_val_linha("RETORNO DO MÊS")
+  ret_dia = get_metric_val("RETORNO DO DIA")
+  ret_mes = get_metric_val("RETORNO DO MÊS")
 
-  # Formatação de %
+  # Tratamento de Porcentagens
   ocup_cam_pct = ocup_cam * 100 if 0 < ocup_cam <= 1 else ocup_cam
   ocup_cd_pct = ocup_cd * 100 if 0 < ocup_cd <= 1 else ocup_cd
   estudo_pct = (
@@ -124,26 +137,28 @@ try:
   ret_dia_pct = ret_dia * 100 if 0 < ret_dia <= 1 else ret_dia
   ret_mes_pct = ret_mes * 100 if 0 < ret_mes <= 1 else ret_mes
 
-  def aplicar_estilo(fig, altura=300):
+  def aplicar_estilo_grafico(fig, altura=300):
     fig.update_layout(
         height=altura,
         showlegend=False,
-        margin=dict(l=10, r=10, t=35, b=10),
+        margin=dict(l=10, r=10, t=30, b=10),
         xaxis=dict(fixedrange=True, title=""),
         yaxis=dict(fixedrange=True, title=""),
         dragmode=False,
     )
-    fig.update_traces(textposition="outside", cliponaxis=False)
     return fig
 
-  plotly_config = {"staticPlot": True, "responsive": True}
+  plotly_config = {
+      "staticPlot": True,
+      "responsive": True,
+  }
 
-  # ================= LINHA 1 =================
-  col1, col2 = st.columns(2)
+  # ================= LINHA 1: OPERAÇÃO E PASSIVOS =================
+  col_l1_1, col_l1_2 = st.columns(2)
 
-  with col1:
+  with col_l1_1:
     st.subheader("📦 Visão Geral de Cargas")
-    df1 = pd.DataFrame({
+    df_g1 = pd.DataFrame({
         "Indicador": [
             "Cargas do Dia",
             "Cargas em D+1",
@@ -160,7 +175,7 @@ try:
         ],
     })
     fig1 = px.bar(
-        df1,
+        df_g1,
         x="Indicador",
         y="Quantidade",
         color="Indicador",
@@ -173,15 +188,15 @@ try:
             "#8E44AD",
         ],
     )
-    max_g1 = max(df1["Quantidade"].max(), 5) * 1.25
-    fig1.update_layout(yaxis_range=[0, max_g1])
     st.plotly_chart(
-        aplicar_estilo(fig1), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig1),
+        use_container_width=True,
+        config=plotly_config,
     )
 
-  with col2:
+  with col_l1_2:
     st.subheader("🚨 Passivos Operacionais")
-    df2 = pd.DataFrame({
+    df_g2 = pd.DataFrame({
         "Indicador": [
             "Total Passivo",
             "Agendamento",
@@ -191,27 +206,27 @@ try:
         "Quantidade": [tot_passivo, pass_agend, pass_rota, pass_sms],
     })
     fig2 = px.bar(
-        df2,
+        df_g2,
         x="Indicador",
         y="Quantidade",
         color="Indicador",
         text_auto=True,
         color_discrete_sequence=["#D35400", "#F39C12", "#E74C3C", "#2980B9"],
     )
-    max_g2 = max(df2["Quantidade"].max(), 5) * 1.25
-    fig2.update_layout(yaxis_range=[0, max_g2])
     st.plotly_chart(
-        aplicar_estilo(fig2), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig2),
+        use_container_width=True,
+        config=plotly_config,
     )
 
   st.markdown("---")
 
-  # ================= LINHA 2 =================
-  col3, col4 = st.columns(2)
+  # ================= LINHA 2: EQUIPES E FROTA =================
+  col_l2_1, col_l2_2 = st.columns(2)
 
-  with col3:
+  with col_l2_1:
     st.subheader("👥 Gestão de Equipes")
-    df3 = pd.DataFrame({
+    df_g3 = pd.DataFrame({
         "Indicador": [
             "Equipes Ativas",
             "Equipes Férias",
@@ -221,68 +236,68 @@ try:
         "Quantidade": [eq_ativa, eq_ferias, absenteismo, cap_equipes],
     })
     fig3 = px.bar(
-        df3,
+        df_g3,
         x="Indicador",
         y="Quantidade",
         color="Indicador",
         text_auto=True,
         color_discrete_sequence=["#27AE60", "#F39C12", "#C0392B", "#2980B9"],
     )
-    max_g3 = max(df3["Quantidade"].max(), 5) * 1.25
-    fig3.update_layout(yaxis_range=[0, max_g3])
     st.plotly_chart(
-        aplicar_estilo(fig3), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig3),
+        use_container_width=True,
+        config=plotly_config,
     )
 
-  with col4:
+  with col_l2_2:
     st.subheader("🚛 Composição da Frota")
-    df4 = pd.DataFrame({
+    df_g4 = pd.DataFrame({
         "Veículo": ["Baiado", "Truck", "HR"],
         "Quantidade": [baiado, truck, hr_frota],
     })
     fig4 = px.bar(
-        df4,
+        df_g4,
         x="Veículo",
         y="Quantidade",
         color="Veículo",
         text_auto=True,
         color_discrete_sequence=["#16A085", "#2980B9", "#8E44AD"],
     )
-    max_g4 = max(df4["Quantidade"].max(), 5) * 1.25
-    fig4.update_layout(yaxis_range=[0, max_g4])
     st.plotly_chart(
-        aplicar_estilo(fig4), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig4),
+        use_container_width=True,
+        config=plotly_config,
     )
 
   st.markdown("---")
 
-  # ================= LINHA 3 =================
-  col5, col6, col7 = st.columns(3)
+  # ================= LINHA 3: ATENDIMENTO, OCUPAÇÃO E RETORNO =================
+  col_l3_1, col_l3_2, col_l3_3 = st.columns(3)
 
-  with col5:
+  with col_l3_1:
     st.subheader("🎯 Atendimento")
-    df5 = pd.DataFrame({
+    df_g5 = pd.DataFrame({
         "Indicador": ["Volume (UC)", "Qtd. Clientes"],
         "Valor": [vol_total, qtd_clientes],
         "Texto": [f"{vol_total:,.0f}".replace(",", "."), f"{qtd_clientes:,.0f}"],
     })
     fig5 = px.bar(
-        df5,
+        df_g5,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#2980B9", "#8E44AD"],
     )
-    max_g5 = max(df5["Valor"].max(), 5) * 1.25
-    fig5.update_layout(yaxis_range=[0, max_g5])
     st.plotly_chart(
-        aplicar_estilo(fig5), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig5),
+        use_container_width=True,
+        config=plotly_config,
     )
 
-  with col6:
+  with col_l3_2:
     st.subheader("📊 Ocupação (%)")
-    df6 = pd.DataFrame({
+    df_g6 = pd.DataFrame({
         "Indicador": [
             "Ocup. Caminhões",
             "Ocup. CD",
@@ -296,39 +311,40 @@ try:
         ],
     })
     fig6 = px.bar(
-        df6,
+        df_g6,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#16A085", "#27AE60", "#F39C12"],
     )
-    fig6.update_layout(yaxis_range=[0, 115])
+    fig6.update_layout(yaxis_range=[0, 100])
     st.plotly_chart(
-        aplicar_estilo(fig6), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig6),
+        use_container_width=True,
+        config=plotly_config,
     )
 
-  with col7:
+  with col_l3_3:
     st.subheader("🔄 Retorno (%)")
-    df7 = pd.DataFrame({
+    df_g7 = pd.DataFrame({
         "Indicador": ["Retorno Dia", "Retorno Mês"],
         "Valor": [ret_dia_pct, ret_mes_pct],
         "Texto": [f"{ret_dia_pct:.2f}%", f"{ret_mes_pct:.2f}%"],
     })
     fig7 = px.bar(
-        df7,
+        df_g7,
         x="Indicador",
         y="Valor",
         color="Indicador",
         text="Texto",
         color_discrete_sequence=["#E74C3C", "#C0392B"],
     )
-    max_ret = max(df7["Valor"].max(), 1.0) * 1.3
-    fig7.update_layout(yaxis_range=[0, max_ret])
     st.plotly_chart(
-        aplicar_estilo(fig7), use_container_width=True, config=plotly_config
+        aplicar_estilo_grafico(fig7),
+        use_container_width=True,
+        config=plotly_config,
     )
 
 except Exception as e:
   st.error(f"Erro ao processar os dados da planilha: {e}")
-    
