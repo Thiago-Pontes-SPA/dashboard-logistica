@@ -16,7 +16,7 @@ try:
   # Seleciona abas ignorando bases
   todas_abas = [s for s in xls.sheet_names if s not in ["Base", "Hoja1"]]
 
-  # Define por padrão a aba de dados reais ('31.10') se existir, senão a primeira da lista
+  # Define por padrão a aba '31.10' se existir, senão a última da lista
   padrao_idx = (
       todas_abas.index("31.10")
       if "31.10" in todas_abas
@@ -24,12 +24,11 @@ try:
   )
 
   st.sidebar.header("⚙️ Configurações")
-  # O Streamlit guarda a escolha do usuário na variável data_selecionada
   data_selecionada = st.sidebar.selectbox(
       "📅 Selecione a Data:", options=todas_abas, index=padrao_idx
   )
 
-  # Carrega estritamente a aba selecionada no menu
+  # Carrega a aba selecionada no menu
   raw_df = pd.read_excel(excel_file, sheet_name=data_selecionada)
 
   unidades_map = {
@@ -66,21 +65,25 @@ try:
       else unidades_map["SPA"]
   )
 
+  # Métricas Principais (KPIs)
   vol_total = get_metric("Volume total", col_idx)
   ocup_cam = get_metric("Ocupação caminhões", col_idx)
   tot_passivo = get_metric("Total passivo", col_idx)
   ret_dia = get_metric("Retorno do dia", col_idx)
 
+  # Dados de Cargas
   cargas_dia = get_metric("Cargas do dia", col_idx)
   cargas_pend = get_metric("Cargas pendentes", col_idx)
   recargas = get_metric("Recargas do dia", col_idx)
 
+  # Dados dos Passivos por Tipo
+  pass_agend = get_metric("Passivo ( Agendamento", col_idx)
   pass_rota = get_metric("Passivo ( Rota )", col_idx)
   pass_sms = get_metric("Passivo ( SMS", col_idx)
-  pass_agend = get_metric("Passivo ( Agendamento", col_idx)
 
   absenteismo = get_metric("Absenteísmo", col_idx)
 
+  # Formatação dos KPIs
   vol_fmt = (
       f"{vol_total:,.0f} UC".replace(",", ".")
       if isinstance(vol_total, (int, float)) and vol_total > 0
@@ -97,21 +100,25 @@ try:
       else f"{ret_dia}%"
   )
 
+  # Exibição dos Cards Superiores
   col1, col2, col3, col4 = st.columns(4)
   with col1:
     st.metric(label="📦 Volume Total", value=vol_fmt)
   with col2:
     st.metric(label="🚛 Ocupação Caminhões", value=ocup_fmt)
   with col3:
-    st.metric(label="⚠️ Total Passivo", value=f"{tot_passivo} casos")
+    st.metric(label="⚠️ Total Passivo", value=f"{tot_passivo} cargas")
   with col4:
     st.metric(label="🔄 Retorno do Dia", value=ret_fmt)
 
   st.markdown("---")
 
+  # Gráficos Dinâmicos
   col_g1, col_g2 = st.columns(2)
+
+  # Gráfico 1: Visão Geral de Cargas
   with col_g1:
-    st.subheader("📦 Visão Geral de Cargas")
+    st.subheader("📦 Visão Geral de Cargas do Dia")
     cargas_df = pd.DataFrame({
         "Status": ["Cargas do Dia", "Pendentes Saída", "Recargas"],
         "Quantidade": [cargas_dia, cargas_pend, recargas],
@@ -124,23 +131,30 @@ try:
         text_auto=True,
         color_discrete_sequence=["#2E86C1", "#F1C40F", "#E74C3C"],
     )
+    fig1.update_layout(showlegend=False, xaxis_title="", yaxis_title="Cargas")
     st.plotly_chart(fig1, use_container_width=True)
 
+  # Gráfico 2: Detalhamento do Passivo (Quantidade e Tipos)
   with col_g2:
-    st.subheader("🚨 Distribuição de Passivos")
+    st.subheader("🚨 Cargas no Passivo por Motivo")
     passivos_df = pd.DataFrame({
-        "Motivo": ["Rota", "SMS", "Agendamento"],
-        "Quantidade": [pass_rota, pass_sms, pass_agend],
+        "Tipo de Passivo": ["Agendamento", "Rota", "SMS"],
+        "Quantidade de Cargas": [pass_agend, pass_rota, pass_sms],
     })
-    fig2 = px.pie(
+    fig2 = px.bar(
         passivos_df,
-        names="Motivo",
-        values="Quantidade",
-        hole=0.4,
-        color_discrete_sequence=["#E74C3C", "#F39C12", "#3498DB"],
+        x="Tipo de Passivo",
+        y="Quantidade de Cargas",
+        color="Tipo de Passivo",
+        text_auto=True,
+        color_discrete_sequence=["#F39C12", "#E74C3C", "#3498DB"],
+    )
+    fig2.update_layout(
+        showlegend=False, xaxis_title="", yaxis_title="Qtd. Cargas"
     )
     st.plotly_chart(fig2, use_container_width=True)
 
+  # Alerta de Absenteísmo
   if absenteismo and str(absenteismo) != "0":
     st.info(f"💡 **Absenteísmo do Dia ({unidade_sel}):** {absenteismo}")
 
