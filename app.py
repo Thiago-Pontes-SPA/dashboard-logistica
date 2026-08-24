@@ -163,7 +163,7 @@ try:
             "Cargas do Dia",
             "Cargas em D+1",
             "Pendentes saída",
-            "Recargas Cam.",
+            "Recargas de Caminhão",
             "Recargas HR",
         ],
         "Quantidade": [
