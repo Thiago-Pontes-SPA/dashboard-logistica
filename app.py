@@ -354,9 +354,9 @@ try:
         ],
         "Valor": [ocup_cam_pct, ocup_cd_pct, estudo_pct],
         "Texto": [
-            f"{ocup_cam_pct:.1f}%",
-            f"{ocup_cd_pct:.1f}%",
-            f"{estudo_pct:.1f}%",
+            f"{ocup_cam_pct:.1f}%".replace(".", ","),
+            f"{ocup_cd_pct:.1f}%".replace(".", ","),
+            f"{estudo_pct:.1f}%".replace(".", ","),
         ],
     })
     fig6 = px.bar(
@@ -379,7 +379,10 @@ try:
     df_g7 = pd.DataFrame({
         "Indicador": ["Retorno Dia", "Retorno Mês"],
         "Valor": [ret_dia_pct, ret_mes_pct],
-        "Texto": [f"{ret_dia_pct:.2f}%", f"{ret_mes_pct:.2f}%"],
+        "Texto": [
+            f"{ret_dia_pct:.2f}%".replace(".", ","),
+            f"{ret_mes_pct:.2f}%".replace(".", ","),
+        ],
     })
     fig7 = px.bar(
         df_g7,
