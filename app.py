@@ -7,50 +7,8 @@ st.set_page_config(
     page_title="Status Operacional Logística", page_icon="🚚", layout="wide"
 )
 
-# Estilização visual temática com elemento da marca
-st.markdown(
-    """
-    <style>
-    .main .block-container {
-        padding-top: 1.5rem;
-    }
-    .coca-header {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 5px;
-    }
-    .coca-title {
-        color: #E41E2B;
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .coca-bar {
-        height: 4px;
-        background: linear-gradient(90deg, #E41E2B 0%, #1E1E1E 100%);
-        border-radius: 2px;
-        margin-bottom: 20px;
-    }
-    </style>
-    <div class="coca-header">
-        <svg width="32" height="42" viewBox="0 0 100 130" fill="#E41E2B" xmlns="http://www.w3.org/2000/svg">
-            <!-- Tampa -->
-            <rect x="38" y="5" width="24" height="6" rx="2" fill="#1E1E1E"/>
-            <!-- Gargalo -->
-            <path d="M42 11 H58 V25 Q58 35 68 45 L72 55 Q78 65 78 80 Q78 115 68 120 Q50 125 32 120 Q22 115 22 80 Q22 65 28 55 L32 45 Q42 35 42 25 Z"/>
-            <!-- Rótulo Central -->
-            <rect x="23" y="65" width="54" height="22" rx="3" fill="#1E1E1E"/>
-            <path d="M30 76 Q40 70 50 76 T70 76" stroke="#E41E2B" stroke-width="3" fill="none"/>
-        </svg>
-        <h1 class="coca-title">Status Operacional de Logística - Gestão BCFNS</h1>
-    </div>
-    <div class="coca-bar"></div>
-""",
-    unsafe_allow_html=True,
-)
-
+# Título do Painel
+st.title("🚚 Status Operacional de Logística - Gestão BCFNS")
 st.subheader("Painel Executivo Diário")
 
 excel_file = "61.xlsx"
